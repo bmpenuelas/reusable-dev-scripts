@@ -1,4 +1,8 @@
 export { defineConfig, validateConfig } from './config.js'
 export { Context } from './context.js'
 export { Failure, runProcess, resolveExecutable } from './runtime.js'
+export { runCli } from './result.js'
+export type { CliOptions } from './result.js'
+export { runSteps } from './steps.js'
+export type { RunStepsOptions } from './steps.js'
 export type { Config, Command, Hooks, Images, NativeLocales, Runner, Invocation } from './types.js'

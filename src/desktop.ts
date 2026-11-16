@@ -29,6 +29,10 @@ export async function electron(ctx: Context, action: string) {
     return
   }
   await ctx.guard(root)
+  if (action === 'clean') {
+    await ownedDirectory(ctx, relative(ctx.root, inside(root, config.output ?? 'release/desktop')), true)
+    return
+  }
   if (action === 'notarize') {
     requireValue(process.platform === 'darwin' || ctx.dryRun, 'Notarization requires macOS')
     const profile = ctx.string('profile', config.notaryProfile ?? '')

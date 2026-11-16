@@ -160,10 +160,10 @@ Each command below starts with `rds`. Configure only the modules you use.
 | Agent skill | `skill install` |
 | Vue/Vite | `vue build` |
 | Capacitor | `capacitor sync`, `copy`, `open`, `live`, `versions`, `prepare`, `assets`, `locales`, `screenshots` |
-| Android | `android build`, `install` |
+| Android | `android build`, `install`, `start-adb` |
 | Mobile stores | `store scaffold`, `check`, `changelog`, `export`, `upload-listing`, `upload-build`, `pull`, `doctor`, `run` |
 | VS Code | `vscode package`, `publish` |
-| Electron | `electron dev`, `assets`, `build`, `notarize` |
+| Electron | `electron dev`, `assets`, `clean`, `build`, `notarize` |
 | Native Swift | `swift icons`, `bundle` |
 | Cloudflare | `cloudflare deploy-worker`, `deploy-pages`, `push-secrets` |
 | Browser extensions | `browser package` |
@@ -177,6 +177,8 @@ npm exec -- rds store upload-listing --help
 ```
 
 The [command reference](docs/commands.md) explains behavior. The [CLI command registry](src/cli.ts) is the executable source of truth for flags, and the exported [configuration types](src/types.ts) describe the API.
+
+Adoption does not require new wrapper scripts. Use bounded hooks such as `capacitor.afterBuild` for application-owned resource generation. If a small custom recipe is necessary, the exported `runSteps` API sequences rds commands with shared process, signal and exit-code handling; see [app-owned recipes](docs/agents.md#app-owned-recipes).
 
 ## Bring your own toolchain
 
@@ -238,7 +240,7 @@ npm install --save-dev --save-exact reusable-dev-scripts@<version>
 To test the exact distributable without a link, run `npm pack` in the toolkit checkout, copy the resulting versioned tarball into the application's `vendor/` directory, and install it from the application:
 
 ```sh
-npm install --save-dev ./vendor/reusable-dev-scripts-0.1.1.tgz
+npm install --save-dev ./vendor/reusable-dev-scripts-0.1.2.tgz
 ```
 
 A tarball is a snapshot: rebuild, repack, and reinstall after toolkit changes. Use its actual versioned filename. A vendored tarball and lockfile can also provide a reproducible dependency before npm publication. See [design and development](docs/design.md) for the release checklist.

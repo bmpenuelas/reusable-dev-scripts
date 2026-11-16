@@ -73,6 +73,46 @@ production, signing, certificate-trust, or data-clearing operations.
 Full in-memory invocation plans are **not redacted**. They may include stdin and
 environment values. Do not upload them or paste them into the final report.
 
+## App-owned recipes
+
+Prefer configuration hooks over a new wrapper: `capacitor.afterBuild` connects
+resource generation between each successful web build and native sync/copy.
+
+For remaining app-owned recipes, the exported `runSteps(steps, options?)` sequences
+**rds argv arrays**, not shell strings or arbitrary task definitions. It launches
+this installed package's CLI with the current Node executable, inherits child
+output/environment, forwards SIGINT/SIGTERM and stops on the first nonzero exit.
+Set `process.exitCode` to its return value. No extra recipe success banner is
+emitted; each CLI retains its normal configured/nested banner behavior.
+
+```js
+import { fileURLToPath } from 'node:url'
+import { runSteps } from 'reusable-dev-scripts'
+
+const root = fileURLToPath(new URL('../', import.meta.url))
+process.exitCode = await runSteps([
+  ['exec', '--', 'node', 'scripts/prepare-native.mjs'],
+  ['android', 'build', '--configuration', 'debug', '--format', 'apk'],
+], { cwd: root, dryRun: process.argv.includes('--dry-run') })
+```
+
+`cwd` defaults to the caller's working directory. Individual rds `--cwd` and
+module-root rules still apply. `dryRun: true` adds `--dry-run` to every CLI
+invocation **before** its passthrough separator, without changing literal tool
+arguments. It starts CLI planning processes, but no external tool steps. Config
+imports remain trusted executable code. An optional `signal: AbortSignal`
+cancels the active invocation and prevents subsequent steps; cancellation returns
+143, SIGINT returns 130. Signal listeners are removed on completion or failure.
+Invalid argv shapes or runner options throw before starting any step. CLI
+command names/flags are validated by each CLI when it runs. Tool/CLI failures
+return their exit code; a CLI startup failure returns 1. Empty steps return 0.
+
+`runCli(argv, options?)` remains available for advanced in-process execution and
+mocked runners. Unlike `runSteps`, it does not isolate each invocation in a child
+process. Pass `--cwd` explicitly, stop on a nonzero return, and forward dry-run to
+each call yourself. Never append rds options after a passthrough `--` separator.
+Neither API implies approval to run signing, uploads, device operations or Git.
+
 ## Completion report
 
 Report:

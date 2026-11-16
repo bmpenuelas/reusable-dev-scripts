@@ -16,7 +16,7 @@ test('strict CLI parsing preserves literal passthrough and inline equals', () =>
 test('all commands have help without loading consumer config', async () => {
   for (const key of Object.keys(commands)) { const lines = []; await main([...key.split(' '), '--help'], undefined, x => lines.push(x)); assert.ok(lines[0].startsWith(`rds ${key}\n`)); assert.match(lines[0], /Options:/) }
   await assert.rejects(main(['vue', 'build', '--registry', 'all']), /not supported/)
-  await assert.rejects(main(['vue', 'build', '--', 'surprise']), /passthrough/)
+  await assert.rejects(main(['capacitor', 'sync', '--', 'surprise']), /passthrough/)
 })
 test('validates hook argv without interpreting translation names as hooks', () => {
   assert.throws(() => validateConfig({ version: 1, capacitor: { prepare: ['npm run build'] } }), /argv/)

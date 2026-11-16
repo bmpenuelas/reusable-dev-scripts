@@ -7,6 +7,7 @@ export default defineConfig({
     platforms: ['android', 'ios'],
     live: { host: '127.0.0.1', port: 5173 },
     // prepare: [['node', 'scripts/prepare-env.mjs', '--env', '{env}']],
+    // afterBuild: [['node', 'scripts/generate-native-resources.mjs', '{platform}']],
     // afterSync: [['node', 'scripts/post-sync.mjs', '{platform}']],
     // verify: [['node', 'scripts/check-native.mjs', '{platform}']],
     // App-owned source composition must run before generating these outputs.

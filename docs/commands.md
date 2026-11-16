@@ -76,7 +76,7 @@ and ask it to read the installed file if automatic discovery is unavailable.
 
 ## Vue
 
-`rds vue build [--mode <mode>] [--skip-typecheck]`
+`rds vue build [--mode <mode>] [--skip-typecheck] [-- <Vite arguments>]`
 
 `vue.root` selects the frontend. `typecheck` is `noEmit` (default), `build`, or
 `false`. `modes` can map an environment to a Vite mode. Without a mapping/flag,
@@ -84,14 +84,18 @@ an explicit `--env` supplies the mode; with neither flag, Vite builds production
 No `NODE_ENV` rewriting is performed. Development servers, lint and tests can
 remain direct npm aliases.
 
+Literal arguments after `--` are passed to Vite, never to the typechecker or a
+shell. A forwarded `--mode` replaces the default; do not also specify the rds
+`--mode` option. Typechecking completes successfully before bundling begins.
+
 ## Capacitor
 
 `capacitor.root` selects the native frontend. Set `platforms: ['android', 'ios']`
 explicitly, or let rds detect native project directories.
 
 - `sync` / `copy`: preparation → assets/locales → **web build per platform** →
-  Capacitor → post-sync hooks → verification → optional IDE open.
-- `--skip-build` skips assets/locales/web compilation only, not preparation,
+  after-build hooks → Capacitor → post-sync hooks → verification → optional IDE open.
+- `--skip-build` skips assets/locales/web compilation and after-build hooks, not preparation,
   post-sync handling or verification. Use existing prebuilt resources intentionally.
 - `open`: IDE only; opening iOS requires macOS.
 - `prepare`: authorization/preparation → version synchronization (optional
@@ -113,6 +117,7 @@ Bounded customization:
 | `prepare`, `prepareByEnv` | argv lists before syncing, in config root |
 | `build` | one build argv command, in Capacitor root |
 | `buildByPlatform` | optional Android/iOS overrides of that build command |
+| `afterBuild` | argv list after each successful default/custom build, before sync/copy, in Capacitor root |
 | `environment` | literal environment mapping with argv-style placeholders, for the build and native CLI |
 | `environmentByPlatform` | overrides for a platform's web build, native CLI and post-sync steps |
 | `afterSync` | argv list for fonts/pruning/SPM normalization, in Capacitor root |
@@ -121,6 +126,11 @@ Bounded customization:
 Default web builds use the Vue module. A custom build hook owns its own
 typechecking. Do not point a build hook back at an npm alias being replaced by
 `rds capacitor sync` (that would recurse).
+
+`afterBuild` receives the same platform environment and `{env}`, `{platform}`,
+`{root}` argv substitutions as the build. It runs once per platform, also in
+`prepare` and the sync phase of `live`, but not for standalone `vue build`.
+A failed build or hook stops the pipeline before Capacitor; dry-run only plans it.
 
 Version files default to `android/app/build.gradle` and
 `ios/App/App.xcodeproj/project.pbxproj`, relative to Capacitor root; override with
@@ -184,6 +194,10 @@ artifact paths relative to Android root.
 - `install [--artifact <config-root-relative-apk>] [--device <serial>]
   [--physical] [--replace]`: installs an **already built** debug/custom APK and
   verifies it. No build, sync, uninstall, launch, or version bump is implicit.
+- `start-adb`: starts the ADB server using the configured SDK or consumer PATH
+  and Android environment. No device, app ID or native project is required.
+  It does not select/install/uninstall an app. Dry-run plans the operation;
+  protected environments still require authorization.
 
 ## Stores
 
@@ -255,6 +269,10 @@ contains the actual frontend build prerequisites.
 
 - `dev` owns a local frontend server, waits for it, launches Electron, and stops
   its server when the app exits. `start` defaults to Vite; `url` must be loopback.
+- `clean`: cleans only `electron.output` (default `release/desktop`), then
+  recreates its ownership marker. An existing unmarked directory is rejected,
+  including in dry-run. Never mark or delete old output automatically to bypass
+  this check; an operator must choose a fresh output or handle legacy files.
 - `build --platform mac|windows|linux --arch arm64|x64|all --format <format>`
   runs electron-builder with `--publish never`. `--unsigned` explicitly disables
   identity discovery. `--clean` only cleans a rds-owned output directory.

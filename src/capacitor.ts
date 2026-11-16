@@ -36,6 +36,7 @@ export async function capacitorSync(ctx: Context, action: 'sync' | 'copy' = 'syn
       const build = config.buildByPlatform?.[platform] ?? config.build
       if (build) await ctx.hooks([build], root, platform, env)
       else await vueBuild(ctx, root, ctx.config.vue?.typecheck ?? 'noEmit', env)
+      await ctx.hooks(config.afterBuild, root, platform, env)
     }
     await ctx.run('cap', [action, platform], { cwd: root, env: { ...androidEnvironment(ctx), ...env }, label: `Capacitor ${action} ${platform}` })
     await ctx.hooks(config.afterSync, root, platform, env)

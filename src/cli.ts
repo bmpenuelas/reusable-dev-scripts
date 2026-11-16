@@ -7,7 +7,7 @@ import { vueBuild } from './vue.js'
 import { capacitorSync, capacitorOpen, capacitorPrepare, capacitorLive } from './capacitor.js'
 import { versions } from './versions.js'
 import { capacitorAssets, locales } from './images.js'
-import { androidBuild, androidInstall } from './android.js'
+import { androidBuild, androidInstall, androidStartAdb } from './android.js'
 import { screenshots } from './screenshots.js'
 import { store } from './store.js'
 import { vscode, browserPackage } from './extensions.js'
@@ -37,6 +37,7 @@ export const commands: Record<string, string[]> = {
   'capacitor locales': ['check'],
   'capacitor screenshots': ['platform', 'action', 'device', 'output', 'input', 'name', 'force', 'guided', 'skip-build', 'mode', 'skip-typecheck'],
   'android build': ['configuration', 'format', 'clean', 'reveal'],
+  'android start-adb': [],
   'android install': ['device', 'physical', 'artifact', 'replace'],
   'store scaffold': [], 'store check': ['platform', 'scope', 'strict', 'all-locales'],
   'store changelog': ['version-code', 'text', 'force'], 'store export': ['platform', 'output', 'format'],
@@ -44,7 +45,7 @@ export const commands: Record<string, string[]> = {
   'store upload-build': ['platform', 'track', 'status', 'groups', 'all-locales'],
   'store pull': ['platform'], 'store doctor': ['platform'], 'store run': [],
   'vscode package': ['output', 'no-dependencies'], 'vscode publish': ['output', 'registry', 'bump', 'no-dependencies'],
-  'electron dev': [], 'electron assets': ['check'], 'electron build': ['platform', 'arch', 'format', 'clean', 'unsigned'],
+  'electron dev': [], 'electron assets': ['check'], 'electron clean': [], 'electron build': ['platform', 'arch', 'format', 'clean', 'unsigned'],
   'electron notarize': ['artifact', 'profile', 'preflight'],
   'swift icons': [], 'swift bundle': ['open'],
   'cloudflare deploy-worker': ['target'], 'cloudflare deploy-pages': ['target', 'branch'], 'cloudflare push-secrets': ['target'],
@@ -71,7 +72,7 @@ export function parse(argv: string[]) {
   return { key, flags, forwarded }
 }
 export function help(key = ''): string {
-  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${['exec', 'android build', 'store run'].includes(key) ? 'Pass literal tool arguments after --.\n' : ''}`
+  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${['exec', 'vue build', 'android build', 'store run'].includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}`
   return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production --banner --no-banner\nResult banners default to on; configure output.banners or RDS_BANNERS=0|1.\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
 }
 export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log, onContext?: (ctx: Context) => void): Promise<Context | undefined> {
@@ -80,7 +81,7 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
   if (!key || flags.help) { log(help(key)); return }
   requireValue(Object.hasOwn(commands, key), `Unknown command: ${key}. Use rds --help`)
   for (const name of Object.keys(flags)) requireValue(Object.hasOwn(globalOptions, name) || commands[key]!.includes(name), `--${name} is not supported by ${key}`)
-  requireValue(!forwarded.length || ['exec', 'android build', 'store run'].includes(key), 'This command does not accept passthrough arguments')
+  requireValue(!forwarded.length || ['exec', 'vue build', 'android build', 'store run'].includes(key), 'This command does not accept passthrough arguments')
   const cwd = resolve(typeof flags.cwd === 'string' ? flags.cwd : process.cwd())
   if (key === 'skill install') {
     requireValue(flags.config === undefined, 'skill install does not load project configuration; use --cwd to select the project')
@@ -96,7 +97,7 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
   const [family, action] = key.split(' ')
   switch (family) {
     case 'exec': requireValue(forwarded.length, 'Use rds exec -- <command> [arguments]'); await ctx.run(forwarded[0]!, forwarded.slice(1), { cwd, label: 'Requested command' }); break
-    case 'vue': await vueBuild(ctx); break
+    case 'vue': await vueBuild(ctx, undefined, undefined, undefined, forwarded); break
     case 'capacitor':
       if (action === 'sync' || action === 'copy') await capacitorSync(ctx, action)
       else if (action === 'open') await capacitorOpen(ctx)
@@ -107,7 +108,7 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
       else if (action === 'locales') await locales(ctx)
       else await screenshots(ctx)
       break
-    case 'android': if (action === 'build') await androidBuild(ctx, forwarded); else await androidInstall(ctx); break
+    case 'android': if (action === 'build') await androidBuild(ctx, forwarded); else if (action === 'start-adb') await androidStartAdb(ctx); else await androidInstall(ctx); break
     case 'store': requireValue(!flags.format || flags.format === 'csv', 'Only CSV store export is implemented'); await store(ctx, action!, forwarded); break
     case 'vscode': await vscode(ctx, action!); break
     case 'electron': await electron(ctx, action!); break

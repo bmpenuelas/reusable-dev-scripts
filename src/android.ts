@@ -48,6 +48,11 @@ export async function adb(ctx: Context, args: string[], capture = true) {
   const binary = sdk ? join(sdk, 'platform-tools', process.platform === 'win32' ? 'adb.exe' : 'adb') : 'adb'
   return ctx.run(binary, args, { env, capture, label: 'Android device operation' })
 }
+export async function androidStartAdb(ctx: Context) {
+  await ctx.guard(ctx.root, 'android')
+  // Starting the daemon needs neither a native project nor a selected device.
+  await adb(ctx, ['start-server'], false)
+}
 export function selectDevice(output: string, requested: string, physical = false): string {
   const devices = output.split(/\r?\n/u).map(line => line.trim().split(/\s+/u)).filter(parts => parts[1] === 'device').map(parts => parts[0]!).filter(id => !physical || !id.startsWith('emulator-'))
   if (requested) { requireValue(devices.includes(requested), 'Requested Android device is unavailable or unauthorized'); return requested }

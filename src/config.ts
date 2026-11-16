@@ -18,7 +18,7 @@ export function validateConfig(value: unknown): Config {
   const fields: Record<string, string[]> = {
     output: ['banners'],
     production: ['environments', 'verify'], vue: ['root', 'typecheck', 'modes'],
-    capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterSync', 'verify'],
+    capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterBuild', 'afterSync', 'verify'],
     android: ['root', 'appId', 'module', 'apk', 'aab', 'mapping', 'javaHome', 'sdkRoot'],
     store: ['root', 'locales', 'appLocales', 'defaultLocale', 'defaultLocales', 'iosDevices', 'androidId', 'iosId', 'appleKey', 'playKey', 'allowExternalCredentials', 'iosProject', 'iosScheme', 'hooks', 'versionPackage'],
     electron: ['root', 'url', 'start', 'assets', 'output', 'builderConfig', 'notaryProfile', 'prepare'],
@@ -50,7 +50,7 @@ export function validateConfig(value: unknown): Config {
   for (const target of Object.values(config.cloudflare?.targets ?? {})) keys(target, ['kind', 'root', 'config', 'directory', 'projectName', 'secretsFile', 'secretNames', 'prepare'], 'Cloudflare target')
   hookList(config.production?.verify)
   for (const section of [config.capacitor, config.electron, config.vscode, config.browser]) hookList(section?.prepare)
-  hookList(config.capacitor?.afterSync); hookList(config.capacitor?.verify); hookList(config.store?.hooks?.beforeUpload)
+  hookList(config.capacitor?.afterBuild); hookList(config.capacitor?.afterSync); hookList(config.capacitor?.verify); hookList(config.store?.hooks?.beforeUpload)
   if (config.capacitor?.build) validateCommand(config.capacitor.build)
   for (const command of Object.values(config.capacitor?.buildByPlatform ?? {})) validateCommand(command)
   for (const commands of Object.values(config.capacitor?.prepareByEnv ?? {})) hookList(commands)

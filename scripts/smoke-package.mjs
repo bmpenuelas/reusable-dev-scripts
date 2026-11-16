@@ -74,6 +74,13 @@ try {
   assert.ok(!failed.stderr.includes('\u001b'))
   const api = await import(pathToFileURL(join(temporary, 'package/dist/index.js')).href)
   assert.equal(api.defineConfig({ version: 1 }).version, 1)
+  assert.equal(typeof api.runCli, 'function')
+  assert.equal(typeof api.runSteps, 'function')
+  const stepOutput = run(process.execPath, ['--input-type=module', '-e', `
+    import { runSteps } from ${JSON.stringify(pathToFileURL(join(temporary, 'package/dist/index.js')).href)};
+    process.exitCode = await runSteps([['exec', '--no-banner', '--', 'node', '-e', "console.log('PACKED_STEPS_OK')"]], { cwd: ${JSON.stringify(temporary)} });
+  `], temporary)
+  assert.match(stepOutput, /PACKED_STEPS_OK/)
   const consumer = join(temporary, 'consumer')
   await mkdir(join(consumer, 'node_modules/vite/bin'), { recursive: true })
   await writeFile(join(consumer, 'reusable-dev-scripts.config.json'), JSON.stringify({ version: 1, vue: { typecheck: false } }))

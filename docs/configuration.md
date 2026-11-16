@@ -158,6 +158,7 @@ export default {
       android: ['npm', 'run', 'build:native:android'],
       ios: ['npm', 'run', 'build:native:ios'],
     },
+    afterBuild: [['node', '{root}/scripts/generate-native-resources.mjs', '{platform}']],
     afterSync: [['node', '{root}/scripts/post-sync.mjs', '{platform}']],
     verify: [['node', '{root}/scripts/verify-native.mjs', '{platform}']],
   },
@@ -170,10 +171,15 @@ executed. Windows batch execution has additional control-character restrictions;
 prefer Node executables for hooks.
 
 Production verification runs before protected mutations in the config root.
-Capacitor preparation runs there too. Builds and post-sync verification run in
+Capacitor preparation runs there too. Builds, after-build hooks and post-sync verification run in
 the Capacitor root. Custom build hooks replace the default Vue build and must
 include their own typechecking. `--skip-build` does not skip preparation or
 verification. See [execution order](commands.md#capacitor).
+
+Use `afterBuild` for application-owned resource generation that must follow the
+web build and precede Capacitor sync/copy. It also works with the default Vue
+build, so no custom build wrapper is needed just for that ordering. It is skipped
+with `--skip-build` and runs once per selected platform.
 
 ## Normalize native resources at the boundary
 

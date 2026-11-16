@@ -1,5 +1,5 @@
 export type Command = readonly [string, ...string[]]
-export type Hooks = { prepare?: Command[]; prepareByEnv?: Record<string, Command[]>; build?: Command; buildByPlatform?: Partial<Record<'android' | 'ios', Command>>; environment?: Record<string, string>; environmentByPlatform?: Partial<Record<'android' | 'ios', Record<string, string>>>; afterSync?: Command[]; verify?: Command[] }
+export type Hooks = { prepare?: Command[]; prepareByEnv?: Record<string, Command[]>; build?: Command; buildByPlatform?: Partial<Record<'android' | 'ios', Command>>; environment?: Record<string, string>; environmentByPlatform?: Partial<Record<'android' | 'ios', Record<string, string>>>; afterBuild?: Command[]; afterSync?: Command[]; verify?: Command[] }
 export type Flags = Record<string, string | boolean>
 export interface Invocation { command: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; input?: string; capture?: boolean; label?: string; timeout?: number; signal?: AbortSignal }
 export interface Result { stdout: string; stderr: string }
