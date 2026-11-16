@@ -25,6 +25,7 @@ try {
   const files = result.files.map(file => file.path)
   assert.ok(files.includes('skills/reusable-dev-scripts/SKILL.md'), 'Missing bundled adoption skill')
   assert.ok(files.includes('dist/skill.js'), 'Missing skill installer')
+  assert.ok(files.includes('dist/result.js'), 'Missing result banner runtime')
   for (const expected of ['bin/rds.mjs', 'dist/cli.js', 'dist/index.js', 'dist/index.d.ts', 'src/types.ts', 'src/cli.ts', 'support/store/Fastfile', 'support/store/Gemfile.lock', 'support/store/metadata.mjs', 'README.md', 'AGENTS.md', 'LICENSE']) assert.ok(files.includes(expected), `Missing packed file: ${expected}`)
   assert.ok(!files.some(path => /^(test|node_modules|\.rds)\//u.test(path)), 'Packed private or generated development files')
   for (const name of files) if (/\.(?:md|mjs|js|json|ts)$/u.test(name)) assertPortableText(await readFile(join(root, name), 'utf8'), name)
@@ -61,6 +62,12 @@ try {
   const invalid = spawnSync(process.execPath, [entry, 'unknown'], { cwd: temporary, encoding: 'utf8', windowsHide: true })
   assert.equal(invalid.status, 1)
   assert.match(invalid.stderr, /^rds: Unknown command:/)
+  const bannerEnv = { ...process.env, RDS_BANNERS: '1', NO_COLOR: '1' }
+  delete bannerEnv.RDS_BANNER_OWNER
+  const failed = spawnSync(process.execPath, [entry, 'exec', '--', 'node', '-e', 'process.exit(7)'], { cwd: temporary, env: bannerEnv, encoding: 'utf8', windowsHide: true })
+  assert.equal(failed.status, 7)
+  assert.match(failed.stderr, /❌  FAILED/)
+  assert.ok(!failed.stderr.includes('\u001b'))
   const api = await import(pathToFileURL(join(temporary, 'package/dist/index.js')).href)
   assert.equal(api.defineConfig({ version: 1 }).version, 1)
   const consumer = join(temporary, 'consumer')

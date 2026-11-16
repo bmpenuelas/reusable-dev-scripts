@@ -94,6 +94,28 @@ In the consuming project, ignore generated state and local secret material:
 
 Use the host or CI secret store for tokens. Do not put credentials in committed configs, hook arguments, or copied example files. Read the [safety model](docs/safety.md) for the limits of dry-run and logging.
 
+## Result banners
+
+Every `rds` command ends with a timestamped success or failure banner by default. A dry-run says **PLAN COMPLETE**, not live success. Banners go to stderr; help and version output stay clean, and nested `rds` calls leave the final banner to their outer command.
+
+Disable them project-wide in `reusable-dev-scripts.config.mjs`:
+
+```js
+export default {
+  version: 1,
+  output: { banners: false },
+}
+```
+
+Override per command with `--no-banner` or `--banner`:
+
+```sh
+npm exec -- rds vue build --no-banner
+npm exec -- rds vue build --banner
+```
+
+For CI, set `RDS_BANNERS=0` or `RDS_BANNERS=1` in the job environment. CLI flags override that variable, which overrides project config. Step logs and error diagnostics remain enabled. See [result banners](docs/commands.md#result-banners) for color controls and startup-error behavior.
+
 ## Install the agent skill
 
 After installing the npm dependency, run from the consuming project's root:

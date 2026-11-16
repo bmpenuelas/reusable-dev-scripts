@@ -14,6 +14,7 @@ universal workflow language.
 | [src/types.ts](../src/types.ts) / [src/config.ts](../src/config.ts) | Public config contract, validation and discovery |
 | [src/context.ts](../src/context.ts) | Environment selection, bounded hooks, guards and dry-run |
 | [src/runtime.ts](../src/runtime.ts) | Consumer tool resolution, argv execution, signals, paths and safe writes |
+| [src/result.ts](../src/result.ts) | Executable-only result banners, output preferences and exit-code preservation |
 | [src/capacitor.ts](../src/capacitor.ts) / [src/android.ts](../src/android.ts) | Native workflow mechanics |
 | [src/versions.ts](../src/versions.ts) | Version preflight and monotonic native numbering |
 | [src/images.ts](../src/images.ts) / [src/screenshots.ts](../src/screenshots.ts) | Normalized assets, locale outputs, capture and resizing |

@@ -16,7 +16,7 @@ import { installSkill } from './skill.js'
 import type { Flags, Runner } from './types.js'
 
 type OptionKind = 'boolean' | 'string'
-const globalOptions: Record<string, OptionKind> = { cwd: 'string', config: 'string', env: 'string', 'dry-run': 'boolean', 'allow-production': 'boolean', help: 'boolean' }
+const globalOptions: Record<string, OptionKind> = { cwd: 'string', config: 'string', env: 'string', 'dry-run': 'boolean', 'allow-production': 'boolean', banner: 'boolean', 'no-banner': 'boolean', help: 'boolean' }
 const options: Record<string, OptionKind> = Object.fromEntries([
   ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch'].map(key => [key, 'string'] as const),
   ...['open', 'skip-build', 'skip-typecheck', 'check', 'bump-build', 'https', 'skip-sync', 'clean', 'reveal', 'physical', 'replace', 'force', 'guided', 'strict', 'all-locales', 'include-changelogs', 'no-dependencies', 'unsigned', 'preflight'].map(key => [key, 'boolean'] as const),
@@ -66,13 +66,14 @@ export function parse(argv: string[]) {
     }
   }
   const key = positional.join(' ')
+  requireValue(!(flags.banner && flags['no-banner']), 'Use only one of --banner or --no-banner')
   return { key, flags, forwarded }
 }
 export function help(key = ''): string {
   if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${['exec', 'android build', 'store run'].includes(key) ? 'Pass literal tool arguments after --.\n' : ''}`
-  return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
+  return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production --banner --no-banner\nResult banners default to on; configure output.banners or RDS_BANNERS=0|1.\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
 }
-export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log): Promise<Context | undefined> {
+export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log, onContext?: (ctx: Context) => void): Promise<Context | undefined> {
   if (argv.length === 1 && argv[0] === '--version') { log('0.1.0'); return }
   const parsed = parse(argv), { key, flags, forwarded } = parsed
   if (!key || flags.help) { log(help(key)); return }
@@ -83,12 +84,14 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
   if (key === 'skill install') {
     requireValue(flags.config === undefined, 'skill install does not load project configuration; use --cwd to select the project')
     const ctx = new Context(cwd, { version: 1 }, flags, runner, log)
+    onContext?.(ctx)
     await installSkill(ctx)
     return ctx
   }
   if (typeof flags.config === 'string') flags.config = resolve(cwd, flags.config)
   const loaded = await loadConfig(cwd, typeof flags.config === 'string' ? flags.config : undefined)
   const ctx = new Context(loaded.root, loaded.config, flags, runner, log)
+  onContext?.(ctx)
   const [family, action] = key.split(' ')
   switch (family) {
     case 'exec': requireValue(forwarded.length, 'Use rds exec -- <command> [arguments]'); await ctx.run(forwarded[0]!, forwarded.slice(1), { cwd, label: 'Requested command' }); break

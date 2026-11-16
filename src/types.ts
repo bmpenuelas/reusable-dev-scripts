@@ -8,6 +8,7 @@ export interface Images { source: string; background?: string; outputs?: { path:
 export interface NativeLocales { locales: Record<string, Record<string, string>>; defaultLocale: string; targets: { format: 'android' | 'apple'; directory: string; keys?: Record<string, string> }[] }
 export interface Config {
   version: 1;
+  output?: { banners?: boolean };
   production?: { environments?: string[]; verify?: Command[] };
   vue?: { root?: string; typecheck?: 'build' | 'noEmit' | false; modes?: Record<string, string> };
   capacitor?: Hooks & { root?: string; packageJson?: string; platforms?: ('android' | 'ios')[]; androidProject?: string; iosProject?: string; assets?: Images & { native?: boolean }; locales?: NativeLocales; live?: { host?: string; port?: number; https?: boolean; ca?: string; timeout?: number }; screenshots?: { output?: string; sizes?: { width: number; height: number }[] } };

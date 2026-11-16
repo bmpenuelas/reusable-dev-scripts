@@ -7,6 +7,8 @@ export class Context {
   readonly environment: string
   readonly dryRun: boolean
   readonly plan: Invocation[] = []
+  /** Set by the executable boundary, not by programmatic workflow consumers. */
+  resultBannerOwner = false
   constructor(public root: string, public config: Config, public flags: Flags, public runner: Runner = runProcess, public log: (message: string) => void = console.log) {
     this.environment = this.string('env', 'development'); this.dryRun = flags['dry-run'] === true
     requireValue(/^[a-zA-Z][\w-]*$/u.test(this.environment), 'Invalid environment name')
@@ -17,7 +19,7 @@ export class Context {
   path(path = '.'): string { return inside(this.root, path) }
   section<T extends keyof Config>(key: T): NonNullable<Config[T]> { const value = this.config[key]; requireValue(value, `Configure ${key} in reusable-dev-scripts.config.mjs first`); return value as NonNullable<Config[T]> }
   async run(command: string, args: string[], options: Partial<Omit<Invocation, 'command' | 'args'>> = {}) {
-    const invocation = { command, args, cwd: options.cwd ?? this.root, ...options, env: { ...process.env, ...options.env, RDS_ENV: this.environment } }
+    const invocation = { command, args, cwd: options.cwd ?? this.root, ...options, env: { ...process.env, ...options.env, RDS_ENV: this.environment, ...(this.resultBannerOwner ? { RDS_BANNER_OWNER: '1' } : {}) } }
     this.plan.push(invocation)
     // Never log argv, stdin, environment values or child error objects: they can contain credentials.
     this.log(`${this.dryRun ? '[plan]' : '[rds]'} ${options.label ?? command}`)

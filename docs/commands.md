@@ -8,6 +8,32 @@ For a first integration, start with [adoption](adoption.md) and the complete
 [configuration patterns](configuration.md). Read the [safety model](safety.md)
 before signing, installing, uploading or deploying.
 
+## Result banners
+
+The executable prints one timestamped result banner to **stderr** after a command:
+`SUCCESS` on exit 0, `FAILED` on failure, or `PLAN COMPLETE` for a successful
+dry-run. The timestamp is ISO 8601 UTC. A banner describes this rds invocation,
+not an entire npm `&&` chain, and dry-run is not proof of a live operation.
+Help, version output and programmatic `main()`/`Context` use have no banners.
+
+Banners default to on. Set `output: { banners: false }` in project configuration
+to disable them. Override with `--banner` or `--no-banner` on any command, or
+set `RDS_BANNERS=1` / `RDS_BANNERS=0` in the shell or CI environment.
+Precedence: CLI flag, environment variable, config, enabled default. Combining
+both flags is an error. Configuration only takes effect after it loads
+successfully; use the flag or environment variable to silence startup errors.
+The config-free `skill install` utility uses only flags/environment/defaults.
+
+Nested rds processes inherit `RDS_BANNER_OWNER=1`, so only the outer invocation
+prints a banner (including when the outer banner is disabled). Ownership
+suppression takes precedence over `--banner`; do not set this internal variable
+as an application setting. Ordinary step logs and diagnostics remain enabled.
+
+TTY output uses green/red/cyan when color is supported; redirected output is
+plain text unless `FORCE_COLOR` is set. `NO_COLOR`, `TERM=dumb`, and `FORCE_COLOR=0`
+disable color, not banners. Summaries contain the known rds command name and exit
+status, never forwarded argv, credentials, or unredacted invocation plans.
+
 ## Paths, environments and hooks
 
 Each module has an optional `root`, relative to the config file. File paths within

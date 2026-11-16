@@ -19,6 +19,25 @@ Discovery searches upward from the working directory. Within a directory, MJS
 takes precedence over JSON. An explicit `--config` selects one file, and its
 directory becomes the configuration root. `--cwd` does not override module roots.
 
+## Result banner preferences
+
+Completion banners are enabled by default. This optional setting disables them
+for commands using the project configuration:
+
+```js
+export default {
+  version: 1,
+  output: { banners: false },
+}
+```
+
+The value must be boolean. Use `--banner` to enable a banner for one invocation,
+`--no-banner` to suppress it, or `RDS_BANNERS=0` / `RDS_BANNERS=1` in CI.
+Flags override the environment, which overrides this setting. See
+[result banners](commands.md#result-banners) for nested commands, startup errors,
+color support and dry-run behavior. The setting changes presentation only;
+it does not skip checks or suppress underlying tool diagnostics.
+
 ## Minimal Vue application
 
 ```js

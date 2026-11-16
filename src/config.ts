@@ -10,12 +10,13 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
     if (key !== 'version') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
   }
   const fields: Record<string, string[]> = {
+    output: ['banners'],
     production: ['environments', 'verify'], vue: ['root', 'typecheck', 'modes'],
     capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterSync', 'verify'],
     android: ['root', 'appId', 'module', 'apk', 'aab', 'mapping', 'javaHome', 'sdkRoot'],
@@ -33,6 +34,7 @@ export function validateConfig(value: unknown): Config {
   const hookList = (value: unknown) => { if (value === undefined) return; requireValue(Array.isArray(value), 'Hooks must be arrays of argv commands'); value.forEach(validateCommand) }
   for (const section of Object.values(data)) if (section && typeof section === 'object' && 'root' in section) requireValue(typeof section.root === 'string' && !!section.root, 'Module root must be a non-empty string')
   const config = data as unknown as Config
+  if (config.output?.banners !== undefined) requireValue(typeof config.output.banners === 'boolean', 'output.banners must be a boolean')
   keys(config.capacitor?.buildByPlatform, ['android', 'ios'], 'buildByPlatform')
   keys(config.capacitor?.environmentByPlatform, ['android', 'ios'], 'environmentByPlatform')
   keys(config.capacitor?.live, ['host', 'port', 'https', 'ca', 'timeout'], 'capacitor.live')
