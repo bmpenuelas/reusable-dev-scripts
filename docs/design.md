@@ -46,6 +46,12 @@ and Windows batch argument handling. It must not act on real application repos
 or remote accounts. Tests requiring unsupported host features may report an
 explicit skip; do not describe a skipped check as passed.
 
+The package smoke test explicitly disables inherited npm dry-run mode only for
+its nested `npm pack --ignore-scripts`, which creates and removes a disposable
+local tarball. This lets `npm publish --dry-run` run the full prepack checks;
+it does not disable the outer publication dry-run or contact the registry to
+publish anything. A regression test runs the smoke with `npm_config_dry_run=true`.
+
 Update the command registry, types/runtime validation, documentation, examples,
 and relevant tests together. Example configs should be importable and generic.
 The [command reference](commands.md) describes behavior; do not rely on CLI names

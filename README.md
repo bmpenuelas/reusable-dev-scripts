@@ -1,10 +1,10 @@
 # reusable-dev-scripts
 
-## one generic implementation for the scritps you write over and over
+## 🚀 one generic implementation for the scritps you write over and over
 
 A collection of development and release automations that brings repeatable workflows to all your projects. Install it as a development dependency, describe your project once in the config, and skip rewriting common automation.
 
-**Agent-friendly 🤖** Copy this prompt into your AI coding agent:
+🤖 **Agent-friendly** Copy this prompt into your AI coding agent:
 
 > Install `reusable-dev-scripts` as a pinned development dependency using npm, then run `npm exec -- rds skill install` from this project's root. Read `.agents/skills/reusable-dev-scripts/SKILL.md` and use that skill to analyze our existing build and release scripts. Propose which scripts can become `rds` commands, explain what must stay project-specific, and wait for my approval before migrating them. Preserve security checks and version ownership; don't deploy, sign, upload, or clear device data without separate approval.
 
@@ -238,7 +238,7 @@ npm install --save-dev --save-exact reusable-dev-scripts@<version>
 To test the exact distributable without a link, run `npm pack` in the toolkit checkout, copy the resulting versioned tarball into the application's `vendor/` directory, and install it from the application:
 
 ```sh
-npm install --save-dev ./vendor/reusable-dev-scripts-0.1.0.tgz
+npm install --save-dev ./vendor/reusable-dev-scripts-0.1.1.tgz
 ```
 
 A tarball is a snapshot: rebuild, repack, and reinstall after toolkit changes. Use its actual versioned filename. A vendored tarball and lockfile can also provide a reproducible dependency before npm publication. See [design and development](docs/design.md) for the release checklist.

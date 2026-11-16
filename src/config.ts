@@ -20,7 +20,7 @@ export function validateConfig(value: unknown): Config {
     production: ['environments', 'verify'], vue: ['root', 'typecheck', 'modes'],
     capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterSync', 'verify'],
     android: ['root', 'appId', 'module', 'apk', 'aab', 'mapping', 'javaHome', 'sdkRoot'],
-    store: ['root', 'locales', 'appLocales', 'defaultLocale', 'defaultLocales', 'iosDevices', 'androidId', 'iosId', 'appleKey', 'playKey', 'iosProject', 'iosScheme', 'hooks', 'versionPackage'],
+    store: ['root', 'locales', 'appLocales', 'defaultLocale', 'defaultLocales', 'iosDevices', 'androidId', 'iosId', 'appleKey', 'playKey', 'allowExternalCredentials', 'iosProject', 'iosScheme', 'hooks', 'versionPackage'],
     electron: ['root', 'url', 'start', 'assets', 'output', 'builderConfig', 'notaryProfile', 'prepare'],
     swift: ['root', 'executable', 'plist', 'resources', 'entitlements', 'output', 'identity', 'icon', 'iconOutput'],
     vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets'], browser: ['root', 'directory', 'output', 'prepare']
@@ -34,6 +34,11 @@ export function validateConfig(value: unknown): Config {
   const hookList = (value: unknown) => { if (value === undefined) return; requireValue(Array.isArray(value), 'Hooks must be arrays of argv commands'); value.forEach(validateCommand) }
   for (const section of Object.values(data)) if (section && typeof section === 'object' && 'root' in section) requireValue(typeof section.root === 'string' && !!section.root, 'Module root must be a non-empty string')
   const config = data as unknown as Config
+  if (config.store?.allowExternalCredentials !== undefined) requireValue(typeof config.store.allowExternalCredentials === 'boolean', 'store.allowExternalCredentials must be a boolean')
+  for (const name of ['playKey', 'appleKey'] as const) {
+    const value = config.store?.[name]
+    if (value !== undefined) requireValue(typeof value === 'string' && value.length > 0 && !value.includes('\0'), `store.${name} must be a non-empty filename`)
+  }
   if (config.output?.banners !== undefined) requireValue(typeof config.output.banners === 'boolean', 'output.banners must be a boolean')
   keys(config.capacitor?.buildByPlatform, ['android', 'ios'], 'buildByPlatform')
   keys(config.capacitor?.environmentByPlatform, ['android', 'ios'], 'environmentByPlatform')

@@ -194,7 +194,13 @@ choose primary folders, `appLocales` can check catalogue coverage, and
 `iosDevices` selects required iPhone/iPad/watch screenshot groups (default iPhone).
 
 Credentials and identities: `androidId`, `iosId`, `playKey`, `appleKey`; key paths
-are relative to **config root**, never shipped or generated here. `versionPackage`
+are relative to **config root**, never shipped or generated here. By default
+they must stay inside the project. Explicit `allowExternalCredentials: true`
+also permits **absolute** external filenames for these two fields only.
+Relative traversal remains rejected. No key content is read/copied during
+config loading or dry-run; real Fastlane operations read the referenced files.
+This opt-in does not affect outputs, native artifacts, gem caches or other paths.
+`versionPackage`
 is also config-root-relative. Optional `iosProject` and `iosScheme` configure the
 TestFlight archive. Android artifact settings use the Android module.
 

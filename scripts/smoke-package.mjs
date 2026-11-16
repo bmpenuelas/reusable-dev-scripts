@@ -19,7 +19,10 @@ const run = (command, args, cwd) => {
 }
 try {
   const npm = process.env.npm_execpath ?? join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
-  const result = JSON.parse(run(process.execPath, [npm, 'pack', '--ignore-scripts', '--json', '--pack-destination', temporary], root))[0]
+  // Publication dry-runs inherit npm_config_dry_run=true into lifecycle scripts.
+  // Only this disposable local fixture needs a real tarball; never change the
+  // outer publish mode or enable lifecycle scripts on the nested pack.
+  const result = JSON.parse(run(process.execPath, [npm, 'pack', '--ignore-scripts', '--dry-run=false', '--json', '--pack-destination', temporary], root))[0]
   assert.equal(result.name, 'reusable-dev-scripts')
   assert.equal(result.filename, `reusable-dev-scripts-${result.version}.tgz`)
   const files = result.files.map(file => file.path)
@@ -55,6 +58,7 @@ try {
   const entry = join(temporary, 'package/bin/rds.mjs')
   const manifest = JSON.parse(await readFile(join(temporary, 'package/package.json'), 'utf8'))
   assert.equal(manifest.name, 'reusable-dev-scripts')
+  assert.equal(run(process.execPath, [entry, '--version'], temporary).trim(), manifest.version)
   assert.deepEqual(manifest.bin, { rds: 'bin/rds.mjs' })
   const help = run(process.execPath, [entry, '--help'], temporary)
   assert.match(help, /^rds /)

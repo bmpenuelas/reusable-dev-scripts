@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, readdir } from 'node:fs/promises'
-import { dirname, join, relative, delimiter } from 'node:path'
+import { dirname, join, relative, delimiter, isAbsolute, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createStoreMetadata } from '../support/store/metadata.mjs'
 import { artifacts, androidRoot } from './android.js'
@@ -10,6 +10,12 @@ import type { Context } from './context.js'
 
 const support = fileURLToPath(new URL('../support/store/', import.meta.url))
 const cli = fileURLToPath(new URL('../bin/rds.mjs', import.meta.url))
+export function storeCredentialPath(ctx: Context, filename: string): string {
+  // Explicit exception for references passed to Fastlane, never output paths.
+  // No key content is opened, copied or logged by configuration/dry-run.
+  if (ctx.config.store?.allowExternalCredentials && isAbsolute(filename)) return resolve(filename)
+  return ctx.path(filename)
+}
 export function storeSettings(ctx: Context) {
   const config = ctx.section('store'), root = ctx.moduleRoot('store')
   requireValue(config.locales?.length, 'Configure store.locales explicitly')
@@ -99,6 +105,8 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     } else args = [platform, action]
   }
   const chosen = args[0] === 'lanes' ? platform : args[0]!
+  const playKey = config.playKey ? storeCredentialPath(ctx, config.playKey) : undefined
+  const appleKey = config.appleKey ? storeCredentialPath(ctx, config.appleKey) : undefined
   if (args[1] === 'internal' && chosen === 'ios') requireValue(process.platform === 'darwin' || ctx.dryRun, 'Building a TestFlight IPA requires macOS/Xcode')
   if (uploading) { await ctx.guard(root); if (!ctx.dryRun && args[1] !== 'internal') await checkStore(ctx, chosen, scope, true); await ctx.hooks(config.hooks?.beforeUpload, ctx.root, chosen) }
   if (chosen === 'ios' && args[0] !== 'lanes') requireValue(config.iosId && config.appleKey, 'Configure store.iosId and store.appleKey')
@@ -116,7 +124,7 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     RDS_DEFAULT_IOS_LOCALE: config.defaultLocales?.ios ?? config.defaultLocale ?? settings.locales[0]!.apple,
     RDS_IOS_PROJECT: ctx.path(config.iosProject ?? join(ctx.config.capacitor?.root ?? '.', 'ios/App/App.xcodeproj')),
     RDS_ANDROID_AAB: artifacts(ctx, 'release', 'aab'), RDS_ANDROID_MAPPING: inside(androidRoot(ctx), ctx.config.android?.mapping ?? 'app/build/outputs/mapping/release/mapping.txt'),
-    ...(config.playKey ? { SUPPLY_JSON_KEY: ctx.path(config.playKey) } : {}), ...(config.appleKey ? { APP_STORE_CONNECT_API_KEY_PATH: ctx.path(config.appleKey) } : {}),
+    ...(playKey ? { SUPPLY_JSON_KEY: playKey } : {}), ...(appleKey ? { APP_STORE_CONNECT_API_KEY_PATH: appleKey } : {}),
     ...(config.androidId ? { SUPPLY_PACKAGE_NAME: config.androidId } : {}), ...(selected ? { PATH: selected + delimiter + (process.env.PATH ?? '') } : {})
   }
   const version = await ctx.run(ruby, ['-e', 'print RUBY_VERSION'], { cwd: ctx.root, capture: true, env, label: 'Ruby version preflight' })

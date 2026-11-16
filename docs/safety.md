@@ -63,6 +63,12 @@ explicitly configured, toolkit-marked output directories. Ownership markers are
 not a backup or a guarantee that an artifact is valid; retain important releases
 elsewhere.
 
+One explicit read-only-reference exception exists: `store.allowExternalCredentials`
+permits absolute external `playKey`/`appleKey` filenames. It defaults to false,
+does not permit relative traversal, and never relaxes output/cleanup containment.
+Keep those files isolated; rds passes their paths to Fastlane rather than copying
+keys into the checkout. Configuration and dry-run do not read key contents.
+
 JavaScript executables resolve from consumer dependencies. The process runner
 passes argv without a shell; validated Windows batch wrappers are the exception
 needed to invoke native batch scripts. An explicit `exec` or hook can still

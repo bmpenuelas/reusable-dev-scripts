@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { Context } from './context.js'
 import { loadConfig } from './config.js'
 import { requireValue } from './runtime.js'
@@ -74,7 +75,7 @@ export function help(key = ''): string {
   return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production --banner --no-banner\nResult banners default to on; configure output.banners or RDS_BANNERS=0|1.\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
 }
 export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log, onContext?: (ctx: Context) => void): Promise<Context | undefined> {
-  if (argv.length === 1 && argv[0] === '--version') { log('0.1.0'); return }
+  if (argv.length === 1 && argv[0] === '--version') { log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version); return }
   const parsed = parse(argv), { key, flags, forwarded } = parsed
   if (!key || flags.help) { log(help(key)); return }
   requireValue(Object.hasOwn(commands, key), `Unknown command: ${key}. Use rds --help`)

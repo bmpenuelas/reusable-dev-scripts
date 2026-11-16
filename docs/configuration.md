@@ -38,6 +38,33 @@ Flags override the environment, which overrides this setting. See
 color support and dry-run behavior. The setting changes presentation only;
 it does not skip checks or suppress underlying tool diagnostics.
 
+## External store credentials
+
+Keys can remain outside a checkout. Explicitly opt in for the two credential
+filename fields, using absolute environment-provided paths:
+
+```js
+export default {
+  version: 1,
+  store: {
+    root: 'store',
+    locales: ['en-US'],
+    androidId: 'com.example.app',
+    allowExternalCredentials: true,
+    playKey: process.env.PLAY_SERVICE_ACCOUNT_KEY,
+    appleKey: process.env.APP_STORE_CONNECT_KEY,
+  },
+}
+```
+
+Only `playKey`/`appleKey` accept this exception. Relative filenames still resolve
+inside the config root; `../` traversal is not enabled. Key contents are not
+loaded by config import or dry-run, copied into the project, or printed by rds.
+Fastlane reads them only during the requested real operation. Leave the opt-in
+off when project-contained keys are sufficient. Outputs and cleanup paths always
+remain contained. Set the relevant credential environment variables before an
+authenticated command; undefined fields are not credentials.
+
 ## Minimal Vue application
 
 ```js
