@@ -1,0 +1,247 @@
+# Store listing lanes for Google Play (supply) and the App Store (deliver).
+# Invoke through `rds store`; see docs/commands.md for options and directory layouts.
+#
+# Listing lanes run scoped metadata checks before uploading. Only the `internal` lanes upload
+# a build, and only for internal testers (Play internal testing, TestFlight).
+# Nothing here submits an app for review or implicitly commits version files.
+skip_docs
+default_platform(:android)
+
+require 'json'
+fastlane_dir = File.join(ENV.fetch('RDS_STORE_ROOT'), 'fastlane')
+store_dir = ENV.fetch('RDS_STORE_ROOT')
+repo_root = ENV.fetch('RDS_PROJECT_ROOT')
+check_script = ENV.fetch('RDS_CLI_ENTRY')
+key_path = ->(env_name, default) { File.expand_path(ENV[env_name] || default, store_dir) }
+
+# Fails with a pointer to the docs instead of fastlane's stack trace when a key is not in place.
+require_key = lambda do |path, what|
+  next if File.exist?(File.expand_path(path))
+  UI.user_error!("#{what} not found at #{path}. Configure the credential file in reusable-dev-scripts.config.mjs.")
+end
+
+# The same checks as `npm run store:check`. Strict also fails on content that is still missing.
+run_check = lambda do |options, platform, scope|
+  args = [ENV.fetch("RDS_NODE"), check_script, "store", "check", *JSON.parse(ENV.fetch("RDS_CHECK_ARGS")), "--platform", platform, "--scope", scope]
+  args << "--strict" if options[:strict] != false
+  sh(*args)
+end
+
+platform :android do
+  play_key = key_path.call("SUPPLY_JSON_KEY", "fastlane/play-service-account.json")
+  tracks = %w[production beta alpha internal]
+
+  # supply attaches listings to an existing release, even when skipping changelogs.
+  # Use the newest release on the first track that has one (or `track:<name>`).
+  private_lane :listing_release do |options|
+    require_key.call(play_key, "Google Play service account key")
+    candidates = options[:track] ? [options[:track]] : tracks
+    track, codes = candidates.lazy
+                             .map { |t| [t, google_play_track_version_codes(track: t)] }
+                             .find { |_, c| c.any? }
+    UI.user_error!("No release on #{candidates.join(', ')}: upload a build first") unless track
+    code = (options[:version_code] || codes.max).to_i
+    UI.message("Attaching the listing to #{track} release #{code}")
+    { track: track, version_code: code }
+  end
+
+  private_lane :upload_listing do |options|
+    upload_to_play_store(
+      **listing_release(options),
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: options[:metadata] == false,
+      skip_upload_changelogs: !options[:changelogs],
+      skip_upload_images: options[:images] == false,
+      skip_upload_screenshots: options[:images] == false,
+      # Hash-compares images so unchanged ones are not sent again.
+      sync_image_upload: true,
+      metadata_path: File.join(fastlane_dir, "metadata/android"),
+      validate_only: options[:validate] || false
+    )
+  end
+
+  # Add `validate:true` to dry-run: Google Play checks the edit and nothing is saved.
+  desc "Upload the Google Play listing text (title, short and full description, video) in every language"
+  lane :listing do |options|
+    run_check.call(options, "android", "text")
+    upload_listing(options.merge(images: false))
+  end
+
+  desc "Upload the listing graphics only: icon, feature graphic, phone and tablet screenshots"
+  lane :images do |options|
+    run_check.call(options, "android", "media")
+    upload_listing(options.merge(metadata: false))
+  end
+
+  desc "Upload the listing text plus all graphics. `changelogs:true` also sends changelogs/<versionCode>.txt"
+  lane :listing_with_images do |options|
+    run_check.call(options, "android", "all")
+    upload_listing(options)
+  end
+
+  # Uploads the bundle built by `npm run android:play:bundle` (`npm run android:play:internal` does
+  # both) and rolls it out to the internal testers, with the R8 mapping for deobfuscated crashes.
+  # Release notes come from changelogs/<versionCode>.txt in each language that has one.
+  # `status:draft` leaves the release as a draft (required while the app has never been published).
+  desc "Upload the release bundle to the internal testing track"
+  lane :internal do |options|
+    require_key.call(play_key, "Google Play service account key")
+    outputs = File.join(repo_root, "android", "app", "build", "outputs")
+    aab = ENV.fetch("RDS_ANDROID_AAB")
+    UI.user_error!("No bundle at #{aab}: run rds android build --format aab first") unless File.exist?(aab)
+    mapping = ENV.fetch("RDS_ANDROID_MAPPING")
+    params = {
+      track: "internal",
+      aab: aab,
+      release_status: options[:status] || "completed",
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: options[:changelogs] == false,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      metadata_path: File.join(fastlane_dir, "metadata/android"),
+      validate_only: options[:validate] || false
+    }
+    params[:mapping] = mapping if File.exist?(mapping)
+    upload_to_play_store(**params)
+
+  end
+
+  desc "Download the live listing into fastlane/downloaded/android to compare with the local files"
+  lane :pull do
+    require_key.call(play_key, "Google Play service account key")
+    download_from_play_store(metadata_path: "./fastlane/downloaded/android")
+  end
+
+  desc "Check the Play key works and show the releases on each track"
+  lane :doctor do
+    require_key.call(play_key, "Google Play service account key")
+    validate_play_store_json_key
+    tracks.each do |track|
+      codes = google_play_track_version_codes(track: track)
+      UI.message("#{track}: #{codes.empty? ? 'no release' : codes.sort.join(', ')}")
+    end
+  end
+end
+
+platform :ios do
+  apple_key = key_path.call("APP_STORE_CONNECT_API_KEY_PATH", "fastlane/app-store-connect-api-key.json")
+  # Read when a lane runs: the Appfile's for_platform blocks only apply once the platform is known.
+  bundle_id = -> { ENV.fetch("RDS_IOS_ID") }
+
+  # Uploads to the App Store version being prepared (create it in App Store Connect first);
+  # never submits it for review. `confirm:true` shows deliver's HTML preview and asks first.
+  private_lane :deliver_listing do |options|
+    require_key.call(apple_key, "App Store Connect API key")
+    params = {
+      api_key_path: apple_key,
+      metadata_path: File.join(fastlane_dir, "metadata/ios"),
+      screenshots_path: File.join(fastlane_dir, "screenshots"),
+      skip_binary_upload: true,
+      skip_app_version_update: true,
+      submit_for_review: false,
+      run_precheck_before_submit: false,
+      precheck_include_in_app_purchases: false,
+      force: !options[:confirm]
+    }
+    params[:app_version] = options[:version] if options[:version]
+    # Opt in: this answers the age rating questionnaire from app_rating_config.json.
+    params[:app_rating_config_path] = File.join(fastlane_dir, "app_rating_config.json") if options[:age_rating]
+    deliver(**params, **options.fetch(:deliver, {}))
+  end
+
+  # App Store Connect has no dry run, so `validate:true` only runs the local checks.
+  desc "Upload the App Store listing text (name, subtitle, description, keywords, promotional text, release notes, URLs, categories, review notes) in every language"
+  lane :listing do |options|
+    run_check.call(options, "ios", "text")
+    next if options[:validate]
+    deliver_listing(options.merge(deliver: { skip_screenshots: true }))
+  end
+
+  desc "Upload the screenshots only (replacing the current ones), for every language with a folder in fastlane/screenshots"
+  lane :screenshots do |options|
+    run_check.call(options, "ios", "media")
+    next if options[:validate]
+    deliver_listing(options.merge(deliver: { skip_metadata: true, overwrite_screenshots: true }))
+  end
+
+  desc "Upload the app preview videos only (replacing the current ones)"
+  lane :previews do |options|
+    run_check.call(options, "ios", "media")
+    next if options[:validate]
+    deliver_listing(options.merge(deliver: {
+      skip_metadata: true, skip_screenshots: true,
+      app_previews_path: File.join(fastlane_dir, "previews"), overwrite_preview_videos: true
+    }))
+  end
+
+  desc "Upload the listing text plus screenshots (replacing the current ones) and app previews"
+  lane :listing_with_images do |options|
+    run_check.call(options, "ios", "all")
+    next if options[:validate]
+    deliver_listing(options.merge(deliver: {
+      overwrite_screenshots: true,
+      app_previews_path: File.join(fastlane_dir, "previews"), overwrite_preview_videos: true
+    }))
+  end
+
+  # Builds ios/App with Xcode (macOS only) after `npm run ios:release:prepare` has bumped and synced
+  # the version (`npm run ios:testflight` does both), then uploads it to TestFlight. Internal groups
+  # with automatic distribution get it once App Store Connect has processed it; `groups:"A,B"`
+  # adds it to those groups as well, waiting for the processing to finish.
+  # "What to Test" is the English release_notes.txt (`notes:false` leaves it empty).
+  desc "Build the App Store .ipa and upload it to TestFlight for the internal testers"
+  lane :internal do |options|
+    UI.user_error!("Building the iOS app needs a Mac with Xcode") unless FastlaneCore::Helper.mac?
+    require_key.call(apple_key, "App Store Connect API key")
+    ipa = build_app(
+      project: ENV.fetch("RDS_IOS_PROJECT"),
+      scheme: ENV.fetch("RDS_IOS_SCHEME", "App"),
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: File.join(repo_root, "release", "ios"),
+      output_name: "App.ipa",
+      clean: true,
+      # Automatic signing: Xcode creates or renews the distribution profiles for the app, the
+      # widget and the watch app, using the Apple ID signed in under Xcode > Settings > Accounts.
+      xcargs: "-allowProvisioningUpdates",
+      export_xcargs: "-allowProvisioningUpdates"
+    )
+    groups = options[:groups].to_s.split(",").map(&:strip).reject(&:empty?)
+    params = {
+      api_key_path: apple_key,
+      ipa: ipa,
+      distribute_external: false,
+      skip_waiting_for_build_processing: groups.empty?
+    }
+    params[:groups] = groups unless groups.empty?
+    notes = File.join(fastlane_dir, "metadata", "ios", ENV.fetch("RDS_DEFAULT_IOS_LOCALE"), "release_notes.txt")
+    params[:changelog] = File.read(notes, encoding: "UTF-8").strip if options[:notes] != false && File.exist?(notes)
+    upload_to_testflight(**params)
+
+  end
+
+  desc "Download the live listing text into fastlane/downloaded/ios to compare with the local files"
+  lane :pull do
+    require_key.call(apple_key, "App Store Connect API key")
+    sh("bundle", "exec", "fastlane", "deliver", "download_metadata",
+       "--api_key_path", apple_key, "--app_identifier", bundle_id.call,
+       "--metadata_path", File.join(fastlane_dir, "downloaded", "ios"), "--force")
+  end
+
+  desc "Check the App Store Connect key works and show the version being prepared"
+  lane :doctor do
+    require_key.call(apple_key, "App Store Connect API key")
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(filepath: File.expand_path(apple_key))
+    app = Spaceship::ConnectAPI::App.find(bundle_id.call)
+    UI.user_error!("No app with bundle ID #{bundle_id.call} in this App Store Connect team") unless app
+    UI.success("#{app.name} (#{app.bundle_id})")
+    version = app.get_edit_app_store_version
+    if version
+      UI.message("Editable version: #{version.version_string} (#{version.app_store_state})")
+    else
+      UI.important("No editable App Store version: create one in App Store Connect before uploading")
+    end
+  end
+end

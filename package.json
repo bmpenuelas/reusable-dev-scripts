@@ -1,0 +1,47 @@
+{
+  "name": "reusable-dev-scripts",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Type-specific development and release tooling for Vue, Capacitor, stores, extensions and desktop apps",
+  "type": "module",
+  "bin": {
+    "rds": "bin/rds.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "support",
+    "skills",
+    "examples",
+    "README.md",
+    "AGENTS.md",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "check": "npm run typecheck && npm test && npm run test:package",
+    "test:package": "node scripts/smoke-package.mjs",
+    "prepare": "npm run build",
+    "prepack": "npm run check"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "typescript": "5.9.3"
+  }
+}

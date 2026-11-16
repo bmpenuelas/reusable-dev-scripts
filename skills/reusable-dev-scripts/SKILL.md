@@ -1,0 +1,46 @@
+---
+name: reusable-dev-scripts
+description: Adopt reusable-dev-scripts in an existing project by mapping duplicated build and release helpers to type-specific rds commands while retaining application-owned behavior.
+---
+
+# Adopt reusable-dev-scripts
+
+Use this skill to integrate the installed npm toolkit, not to replace a project's stack or invent a universal task engine. Work only in the project the user selected.
+
+## Find the installed contract
+
+Run commands from the consuming project. If the dependency is missing, install `reusable-dev-scripts` as an exact, development-only dependency using the project's package manager and lockfile conventions. Do not download an unrelated package named after the `rds` executable.
+
+Locate the installed entry point without executing it:
+
+```sh
+node --input-type=module -e "console.log(import.meta.resolve('reusable-dev-scripts'))"
+```
+
+The result points to `dist/index.js`; its parent package directory contains the version-matched guides below. For a linked checkout, use the resolved package directory, not a guessed sibling repository. Read these files there:
+
+- `docs/agents.md`: integration procedure and completion report.
+- `docs/adoption.md`: module boundaries and migration sequence.
+- `docs/configuration.md`, `docs/commands.md`, and the relevant `examples/*.config.mjs`: supported configuration and execution order.
+- `docs/safety.md`: before any workflow with side effects.
+- `src/types.ts`, `src/config.ts`, and `src/cli.ts`: when supported fields, validation, or flags need clarification.
+
+Use `npm exec -- rds <module> <command> --help` after installing the dependency. If no toolkit workflow matches, keep the local implementation rather than inventing flags or repository presets.
+
+## Map behavior before changing aliases
+
+Read the project's instructions, manifests, and actual helper implementations. Record working directories, environment variants, version/lockfile ownership, generators, native transformations, checks, and side effects. Script names alone are not a behavior specification.
+
+Propose a concise old-alias → rds-command mapping, listing retained local hooks and any unsupported behavior. If the user requested analysis only or an approval checkpoint, stop there; otherwise implement within the requested scope, one workflow at a time.
+
+Add the smallest `reusable-dev-scripts.config.mjs` or JSON config, thin npm aliases, and an ignore rule for `.rds/`. Configure only relevant modules. Keep ordinary lint/test/dev-tool aliases direct when no duplicated mechanics need replacing.
+
+Keep product-specific source generation, domain policy, approvals, signing choices, secrets, and native verification in the application. Hooks are argv arrays, not shell strings. Avoid recursion: a hook must not call the alias that invokes it. Version bumps must remain explicit; retrying a build/upload must not silently increment again.
+
+## Verify and report honestly
+
+Start with help, configuration validation and dry-run, then existing local checks. Keep old helpers until equivalent behavior is demonstrated. Do not turn a plan into a claim that a native artifact or remote workflow succeeded.
+
+Do not run deployments, store uploads, signing, device replacement/data clearing, or production actions just to verify a migration. Obtain the user's approval for those effects separately. `--allow-production` is acknowledgement, not a substitute for the application's authorization boundary.
+
+Report changed aliases/configuration, local behavior deliberately retained, checks actually run, and remaining native/account acceptance work. Never include credentials or unredacted invocation plans in reports. If the agent does not automatically discover this skill, read this file explicitly; a new session may be needed for automatic discovery.

@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { main } from '../dist/cli.js'
+try { await main(process.argv.slice(2)) }
+catch (error) {
+  console.error(`rds: ${error instanceof Error ? error.message : 'Command failed'}`)
+  process.exitCode = error?.exitCode || 1
+}
