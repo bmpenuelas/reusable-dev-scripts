@@ -1,8 +1,6 @@
 # Troubleshooting
 
-Start with `npm exec -- rds <module> <command> --help`. The
-[command registry](../src/cli.ts) and [configuration types](../src/types.ts) show
-what the installed implementation actually supports.
+Start with `npm exec -- rds <module> <command> --help`. The [command registry](../src/cli.ts) and [configuration types](../src/types.ts) show what the installed implementation actually supports.
 
 | Symptom | Check / resolution |
 | --- | --- |
@@ -20,9 +18,6 @@ what the installed implementation actually supports.
 | Ruby/Bundler is unavailable | Install Ruby >=3.3 and Bundler separately. `STORE_RUBY` can select the Ruby executable. Credentials and gems are not installed globally by this tool. |
 | Tests skip a filesystem/platform feature | Read the explicit skip reason and rerun in a suitable environment when that feature must be validated. Report a skip as a skip, not a passing check. |
 
-Keep diagnostics safe: avoid copying credential files, full environment dumps,
-or unredacted invocation plans. A dry-run can validate the plan without proving
-that a native build, signature, remote account, or deployment will succeed.
+Keep diagnostics safe: avoid copying credential files, full environment dumps, or unredacted invocation plans. A dry-run can validate the plan without proving that a native build, signature, remote account, or deployment will succeed.
 
-[Command reference](commands.md) · [Configuration patterns](configuration.md) ·
-[Safety model](safety.md)
+[Command reference](commands.md) · [Configuration patterns](configuration.md) · [Safety model](safety.md)

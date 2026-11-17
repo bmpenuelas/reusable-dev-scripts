@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { gunzipSync } from 'node:zlib'
 import { dirname, join, resolve } from 'node:path'
@@ -19,10 +19,19 @@ const run = (command, args, cwd) => {
 }
 try {
   const npm = process.env.npm_execpath ?? join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
+  // Some npm 10/pacote versions still run prepare despite --ignore-scripts.
+  // Packing the live checkout would race parallel tests reading dist/*.js.
+  // Preserve the real manifest and isolate any such build in this snapshot.
+  const source = outputPath(temporary, 'source')
+  const sourceManifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+  await mkdir(source)
+  for (const name of [...sourceManifest.files, 'package.json', 'LICENSE', 'tsconfig.json']) {
+    await cp(outputPath(root, name), outputPath(source, name), { recursive: true })
+  }
   // Publication dry-runs inherit npm_config_dry_run=true into lifecycle scripts.
   // Only this disposable local fixture needs a real tarball; never change the
-  // outer publish mode or enable lifecycle scripts on the nested pack.
-  const result = JSON.parse(run(process.execPath, [npm, 'pack', '--ignore-scripts', '--dry-run=false', '--json', '--pack-destination', temporary], root))[0]
+  // outer publish mode or deliberately enable lifecycle scripts on the nested pack.
+  const result = JSON.parse(run(process.execPath, [npm, 'pack', '--ignore-scripts', '--dry-run=false', '--json', '--pack-destination', temporary], source))[0]
   assert.equal(result.name, 'reusable-dev-scripts')
   assert.equal(result.filename, `reusable-dev-scripts-${result.version}.tgz`)
   const files = result.files.map(file => file.path)
@@ -31,7 +40,7 @@ try {
   assert.ok(files.includes('dist/result.js'), 'Missing result banner runtime')
   for (const expected of ['bin/rds.mjs', 'dist/cli.js', 'dist/index.js', 'dist/index.d.ts', 'src/types.ts', 'src/cli.ts', 'support/store/Fastfile', 'support/store/Gemfile.lock', 'support/store/metadata.mjs', 'README.md', 'AGENTS.md', 'LICENSE']) assert.ok(files.includes(expected), `Missing packed file: ${expected}`)
   assert.ok(!files.some(path => /^(test|node_modules|\.rds)\//u.test(path)), 'Packed private or generated development files')
-  for (const name of files) if (/\.(?:md|mjs|js|json|ts)$/u.test(name)) assertPortableText(await readFile(join(root, name), 'utf8'), name)
+  for (const name of files) if (/\.(?:md|mjs|js|json|ts)$/u.test(name)) assertPortableText(await readFile(join(source, name), 'utf8'), name)
   const tar = gunzipSync(await readFile(join(temporary, result.filename)))
   for (let position = 0; position + 512 <= tar.length;) {
     const header = tar.subarray(position, position + 512)

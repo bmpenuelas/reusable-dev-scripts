@@ -1,10 +1,6 @@
 # Configuration patterns
 
-Use an MJS config for imported catalogues and editor assistance, or JSON for
-data-only configuration. MJS is trusted executable code. The exported
-[Config type](../src/types.ts) is authoritative; runtime validation lives in
-[config.ts](../src/config.ts). `// @ts-check` enables JavaScript editor diagnostics
-where supported.
+Use an MJS config for imported catalogues and editor assistance, or JSON for data-only configuration. MJS is trusted executable code. The exported [Config type](../src/types.ts) is authoritative; runtime validation lives in [config.ts](../src/config.ts). `// @ts-check` enables JavaScript editor diagnostics where supported.
 
 For a data-only alternative, save `reusable-dev-scripts.config.json`:
 
@@ -15,14 +11,11 @@ For a data-only alternative, save `reusable-dev-scripts.config.json`:
 }
 ```
 
-Discovery searches upward from the working directory. Within a directory, MJS
-takes precedence over JSON. An explicit `--config` selects one file, and its
-directory becomes the configuration root. `--cwd` does not override module roots.
+Discovery searches upward from the working directory. Within a directory, MJS takes precedence over JSON. An explicit `--config` selects one file, and its directory becomes the configuration root. `--cwd` does not override module roots.
 
 ## Result banner preferences
 
-Completion banners are enabled by default. This optional setting disables them
-for commands using the project configuration:
+Completion banners are enabled by default. This optional setting disables them for commands using the project configuration:
 
 ```js
 export default {
@@ -31,17 +24,11 @@ export default {
 }
 ```
 
-The value must be boolean. Use `--banner` to enable a banner for one invocation,
-`--no-banner` to suppress it, or `RDS_BANNERS=0` / `RDS_BANNERS=1` in CI.
-Flags override the environment, which overrides this setting. See
-[result banners](commands.md#result-banners) for nested commands, startup errors,
-color support and dry-run behavior. The setting changes presentation only;
-it does not skip checks or suppress underlying tool diagnostics.
+The value must be boolean. Use `--banner` to enable a banner for one invocation, `--no-banner` to suppress it, or `RDS_BANNERS=0` / `RDS_BANNERS=1` in CI. Flags override the environment, which overrides this setting. See [result banners](commands.md#result-banners) for nested commands, startup errors, color support and dry-run behavior. The setting changes presentation only; it does not skip checks or suppress underlying tool diagnostics.
 
 ## External store credentials
 
-Keys can remain outside a checkout. Explicitly opt in for the two credential
-filename fields, using absolute environment-provided paths:
+Keys can remain outside a checkout. Explicitly opt in for the two credential filename fields, using absolute environment-provided paths:
 
 ```js
 export default {
@@ -57,13 +44,7 @@ export default {
 }
 ```
 
-Only `playKey`/`appleKey` accept this exception. Relative filenames still resolve
-inside the config root; `../` traversal is not enabled. Key contents are not
-loaded by config import or dry-run, copied into the project, or printed by rds.
-Fastlane reads them only during the requested real operation. Leave the opt-in
-off when project-contained keys are sufficient. Outputs and cleanup paths always
-remain contained. Set the relevant credential environment variables before an
-authenticated command; undefined fields are not credentials.
+Only `playKey`/`appleKey` accept this exception. Relative filenames still resolve inside the config root; `../` traversal is not enabled. Key contents are not loaded by config import or dry-run, copied into the project, or printed by rds. Fastlane reads them only during the requested real operation. Leave the opt-in off when project-contained keys are sufficient. Outputs and cleanup paths always remain contained. Set the relevant credential environment variables before an authenticated command; undefined fields are not credentials.
 
 ## Minimal Vue application
 
@@ -77,8 +58,7 @@ export default defineConfig({
 })
 ```
 
-Run `npm exec -- rds vue build`. Keep normal development servers and simple
-lint/test aliases direct when they need no shared helper implementation.
+Run `npm exec -- rds vue build`. Keep normal development servers and simple lint/test aliases direct when they need no shared helper implementation.
 
 ## Workspace paths
 
@@ -95,11 +75,7 @@ export default {
 }
 ```
 
-Module `root` values are relative to the config directory. Module-internal paths
-are usually relative to that module root; explicitly documented exceptions such
-as `capacitor.packageJson` and store credential paths are config-root-relative.
-Paths must remain inside the project. Use `--cwd apps/mobile` to select a working
-directory while still discovering the root config.
+Module `root` values are relative to the config directory. Module-internal paths are usually relative to that module root; explicitly documented exceptions such as `capacitor.packageJson` and store credential paths are config-root-relative. Paths must remain inside the project. Use `--cwd apps/mobile` to select a working directory while still discovering the root config.
 
 ## Environments are not platforms or distribution variants
 
@@ -110,9 +86,7 @@ directory while still discovering the root config.
 | Platform | `--platform ios` | Native target or desktop platform, as supported by the command |
 | Distribution variant | generated Store/direct source roots | Application-owned source, entitlements, IDs and distribution policy |
 
-`--env` does not rewrite `NODE_ENV`. Without an explicit mode, a Vue build uses
-the configured environment-to-mode mapping, then an explicit environment name,
-or production when neither flag was supplied.
+`--env` does not rewrite `NODE_ENV`. Without an explicit mode, a Vue build uses the configured environment-to-mode mapping, then an explicit environment name, or production when neither flag was supplied.
 
 ```js
 export default {
@@ -131,14 +105,11 @@ export default {
 }
 ```
 
-The variable names above are application conventions, not magic `rds` settings.
-Your frontend/native config must read them. Default web builds receive the
-mapping, and native CLI/post-sync steps receive it too.
+The variable names above are application conventions, not magic `rds` settings. Your frontend/native config must read them. Default web builds receive the mapping, and native CLI/post-sync steps receive it too.
 
 ## Connect bounded hooks
 
-The script/alias names below stand for **your existing application-owned
-commands**. They are not generated by `rds`:
+The script/alias names below stand for **your existing application-owned commands**. They are not generated by `rds`:
 
 ```js
 export default {
@@ -165,26 +136,15 @@ export default {
 }
 ```
 
-Hooks are argv arrays, not shell strings. Only `{root}`, `{env}`, and `{platform}`
-are substituted. Spaces remain within argument values; shell operators are not
-executed. Windows batch execution has additional control-character restrictions;
-prefer Node executables for hooks.
+Hooks are argv arrays, not shell strings. Only `{root}`, `{env}`, and `{platform}` are substituted. Spaces remain within argument values; shell operators are not executed. Windows batch execution has additional control-character restrictions; prefer Node executables for hooks.
 
-Production verification runs before protected mutations in the config root.
-Capacitor preparation runs there too. Builds, after-build hooks and post-sync verification run in
-the Capacitor root. Custom build hooks replace the default Vue build and must
-include their own typechecking. `--skip-build` does not skip preparation or
-verification. See [execution order](commands.md#capacitor).
+Production verification runs before protected mutations in the config root. Capacitor preparation runs there too. Builds, after-build hooks and post-sync verification run in the Capacitor root. Custom build hooks replace the default Vue build and must include their own typechecking. `--skip-build` does not skip preparation or verification. See [execution order](commands.md#capacitor).
 
-Use `afterBuild` for application-owned resource generation that must follow the
-web build and precede Capacitor sync/copy. It also works with the default Vue
-build, so no custom build wrapper is needed just for that ordering. It is skipped
-with `--skip-build` and runs once per selected platform.
+Use `afterBuild` for application-owned resource generation that must follow the web build and precede Capacitor sync/copy. It also works with the default Vue build, so no custom build wrapper is needed just for that ordering. It is skipped with `--skip-build` and runs once per selected platform.
 
 ## Normalize native resources at the boundary
 
-Keep catalogue parsing and artwork composition local. Pass normalized inputs
-rather than making shared tooling understand application-specific source layouts:
+Keep catalogue parsing and artwork composition local. Pass normalized inputs rather than making shared tooling understand application-specific source layouts:
 
 ```js
 export default {
@@ -210,9 +170,7 @@ export default {
 }
 ```
 
-An MJS config can import a local catalogue adapter that returns this data shape.
-Keep resource membership, native declarations, and custom widget data in the
-application. Add separate targets to emit ordinary watch/widget string files.
+An MJS config can import a local catalogue adapter that returns this data shape. Keep resource membership, native declarations, and custom widget data in the application. Add separate targets to emit ordinary watch/widget string files.
 
 ## Separate deployment mechanics from application policy
 
@@ -238,7 +196,4 @@ export default {
 }
 ```
 
-Select a target and explicit environment when invoking a Cloudflare command.
-Keep account configuration, domains, header policy and secret generation local.
-See [Cloudflare commands](commands.md#cloudflare) and the
-[safety model](safety.md) before deploying.
+Select a target and explicit environment when invoking a Cloudflare command. Keep account configuration, domains, header policy and secret generation local. See [Cloudflare commands](commands.md#cloudflare) and the [safety model](safety.md) before deploying.
