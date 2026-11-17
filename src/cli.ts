@@ -14,12 +14,16 @@ import { vscode, browserPackage } from './extensions.js'
 import { cloudflare } from './cloudflare.js'
 import { electron, swift } from './desktop.js'
 import { installSkill } from './skill.js'
+import { devStart } from './dev.js'
+import { waitTcp } from './wait.js'
+import { env } from './env.js'
+import { prisma } from './prisma.js'
 import type { Flags, Runner } from './types.js'
 
 type OptionKind = 'boolean' | 'string'
 const globalOptions: Record<string, OptionKind> = { cwd: 'string', config: 'string', env: 'string', 'dry-run': 'boolean', 'allow-production': 'boolean', banner: 'boolean', 'no-banner': 'boolean', help: 'boolean' }
 const options: Record<string, OptionKind> = Object.fromEntries([
-  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch'].map(key => [key, 'string'] as const),
+  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch', 'timeout', 'confirm-host'].map(key => [key, 'string'] as const),
   ...['open', 'skip-build', 'skip-typecheck', 'check', 'bump-build', 'https', 'skip-sync', 'clean', 'reveal', 'physical', 'replace', 'force', 'guided', 'strict', 'all-locales', 'include-changelogs', 'no-dependencies', 'unsigned', 'preflight'].map(key => [key, 'boolean'] as const),
   ...Object.entries(globalOptions)
 ])
@@ -49,7 +53,10 @@ export const commands: Record<string, string[]> = {
   'electron notarize': ['artifact', 'profile', 'preflight'],
   'swift icons': [], 'swift bundle': ['open'],
   'cloudflare deploy-worker': ['target'], 'cloudflare deploy-pages': ['target', 'branch'], 'cloudflare push-secrets': ['target'],
-  'browser package': ['output']
+  'browser package': ['output'],
+  'dev start': [], 'wait tcp': ['target', 'timeout'],
+  'env template': [], 'env validate': [], 'env generate': [], 'env check': [],
+  'prisma migrate': ['confirm-host'], 'prisma status': []
 }
 export function parse(argv: string[]) {
   const positional: string[] = [], flags: Flags = {}; let forwarded: string[] = []
@@ -72,7 +79,7 @@ export function parse(argv: string[]) {
   return { key, flags, forwarded }
 }
 export function help(key = ''): string {
-  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${['exec', 'vue build', 'android build', 'store run'].includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}`
+  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${['exec', 'vue build', 'android build', 'store run'].includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}${key === 'android build' ? '--reveal is best-effort; file-manager failure only warns after a verified build.\n' : ''}`
   return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production --banner --no-banner\nResult banners default to on; configure output.banners or RDS_BANNERS=0|1.\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
 }
 export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log, onContext?: (ctx: Context) => void): Promise<Context | undefined> {
@@ -115,6 +122,10 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
     case 'swift': await swift(ctx, action!); break
     case 'cloudflare': await cloudflare(ctx, action!); break
     case 'browser': await browserPackage(ctx); break
+    case 'dev': await devStart(ctx); break
+    case 'wait': await waitTcp(ctx); break
+    case 'env': await env(ctx, action!); break
+    case 'prisma': await prisma(ctx, action!); break
   }
   return ctx
 }

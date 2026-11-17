@@ -10,7 +10,7 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
     if (key !== 'version') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
@@ -23,7 +23,8 @@ export function validateConfig(value: unknown): Config {
     store: ['root', 'locales', 'appLocales', 'defaultLocale', 'defaultLocales', 'iosDevices', 'androidId', 'iosId', 'appleKey', 'playKey', 'allowExternalCredentials', 'iosProject', 'iosScheme', 'hooks', 'versionPackage'],
     electron: ['root', 'url', 'start', 'assets', 'output', 'builderConfig', 'notaryProfile', 'prepare'],
     swift: ['root', 'executable', 'plist', 'resources', 'entitlements', 'output', 'identity', 'icon', 'iconOutput'],
-    vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets'], browser: ['root', 'directory', 'output', 'prepare']
+    vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets'], browser: ['root', 'directory', 'output', 'prepare'],
+    dev: ['root', 'processes'], wait: ['targets'], env: ['directory', 'module', 'environments', 'autoCreate', 'hints'], prisma: ['root', 'envFile', 'variable']
   }
   const keys = (entry: unknown, allowed: string[], label: string) => {
     if (entry === undefined) return
@@ -48,6 +49,30 @@ export function validateConfig(value: unknown): Config {
   keys(config.store?.iosDevices, ['iphone', 'ipad', 'watch'], 'store.iosDevices')
   if (config.production?.environments) requireValue(Array.isArray(config.production.environments) && config.production.environments.length > 0 && config.production.environments.every(x => typeof x === 'string' && x.length), 'production.environments must be a non-empty string array')
   for (const target of Object.values(config.cloudflare?.targets ?? {})) keys(target, ['kind', 'root', 'config', 'directory', 'projectName', 'secretsFile', 'secretNames', 'prepare'], 'Cloudflare target')
+  keys(config.env?.hints, ['template', 'generate'], 'env.hints')
+  if (config.dev) {
+    requireValue(Array.isArray(config.dev.processes) && config.dev.processes.length > 0, 'dev.processes must be a non-empty array')
+    const names = new Set<string>()
+    for (const entry of config.dev.processes) {
+      keys(entry, ['name', 'command', 'root', 'environment'], 'dev process')
+      requireValue(typeof entry.name === 'string' && /^[\w.-]+$/u.test(entry.name) && !names.has(entry.name), 'dev process names must be unique and use letters, digits, dot, dash or underscore')
+      names.add(entry.name); validateCommand(entry.command)
+      if (entry.root !== undefined) requireValue(typeof entry.root === 'string' && entry.root.length > 0, 'dev process root must be a non-empty string')
+    }
+  }
+  if (config.wait) requireValue(config.wait.targets && typeof config.wait.targets === 'object' && !Array.isArray(config.wait.targets), 'wait.targets must be an object')
+  for (const target of Object.values(config.wait?.targets ?? {})) {
+    keys(target, ['host', 'port', 'url', 'variable', 'envFile', 'timeout', 'hint'], 'wait target')
+    requireValue(!!(target.url || target.variable || (target.host && target.port)), 'A wait target needs host and port, a url, or a variable')
+    for (const field of ['port', 'timeout'] as const) if (target[field] !== undefined) requireValue(typeof target[field] === 'number' && target[field] > 0, `wait target ${field} must be a positive number`)
+    for (const field of ['host', 'url', 'variable', 'envFile', 'hint'] as const) if (target[field] !== undefined) requireValue(typeof target[field] === 'string' && target[field].length > 0, `wait target ${field} must be a non-empty string`)
+  }
+  if (config.env) {
+    requireValue(typeof config.env.module === 'string' && config.env.module.length > 0, 'env.module must be a non-empty string')
+    for (const field of ['environments', 'autoCreate'] as const) if (config.env[field] !== undefined) requireValue(Array.isArray(config.env[field]) && config.env[field].every(x => typeof x === 'string' && /^[a-zA-Z][\w-]*$/u.test(x)), `env.${field} must be an array of environment names`)
+  }
+  if (config.prisma) requireValue(typeof config.prisma.envFile === 'string' && config.prisma.envFile.length > 0, 'prisma.envFile must be a non-empty string')
+  if (config.prisma?.variable !== undefined) requireValue(typeof config.prisma.variable === 'string' && /^[A-Za-z_]\w*$/u.test(config.prisma.variable), 'prisma.variable must be an environment variable name')
   hookList(config.production?.verify)
   for (const section of [config.capacitor, config.electron, config.vscode, config.browser]) hookList(section?.prepare)
   hookList(config.capacitor?.afterBuild); hookList(config.capacitor?.afterSync); hookList(config.capacitor?.verify); hookList(config.store?.hooks?.beforeUpload)

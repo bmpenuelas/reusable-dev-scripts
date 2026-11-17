@@ -10,6 +10,7 @@ Copy the relevant config into your application as `reusable-dev-scripts.config.m
 | [vscode.config.mjs](vscode.config.mjs) | Existing compile alias and VS Code manifest |
 | [electron.config.mjs](electron.config.mjs) | Existing frontend build and Electron entry/builder config |
 | [swift.config.mjs](swift.config.mjs) | Existing SwiftPM product with plist, resources and entitlements |
+| [services.config.mjs](services.config.mjs) | Backend/frontend monorepo with a database, environment files and Prisma |
 
 - Replace every synthetic ID, project name, source path, profile, and output path.
 - Configure only modules you use. Tool dependencies and native SDKs remain yours.

@@ -65,3 +65,30 @@ test('dry-run neither spawns nor reveals secret argv', async () => {
   const f = await fixture({ version: 1 }, { 'dry-run': true }); await f.ctx.run('node', ['-e', 'super-secret'], { input: 'private-secret' })
   assert.equal(f.calls.length, 0); assert.ok(!f.messages.join('').includes('secret')); assert.equal(existsSync(join(f.root, '.rds')), false)
 })
+
+test('nonzero success conventions are opt-in per invocation and never suppress other failures', async () => {
+  const f = await fixture()
+  const invocation = { command: 'node', args: ['-e', 'process.exit(1)'], cwd: f.root, capture: true, label: 'Fixture process' }
+  await assert.rejects(runProcess(invocation), error => error instanceof Failure && error.exitCode === 1)
+  assert.deepEqual(await runProcess({ ...invocation, successExitCodes: [0, 1] }), { stdout: '', stderr: '' })
+  // The exception must not leak to the next process, or accept a different failure.
+  await assert.rejects(runProcess(invocation), error => error instanceof Failure && error.exitCode === 1)
+  await assert.rejects(runProcess({ ...invocation, args: ['-e', 'process.exit(7)'], successExitCodes: [0, 1] }), error => error instanceof Failure && error.exitCode === 7)
+  await assert.rejects(runProcess({ ...invocation, command: 'missing-private-fixture-tool', successExitCodes: [0, 1] }), /Cannot start Fixture process/)
+  await assert.rejects(runProcess({ ...invocation, args: ['-e', 'setTimeout(()=>{},10000)'], timeout: 30, successExitCodes: [0, 1] }), /timed out/)
+  await assert.rejects(runProcess({ ...invocation, args: ['-e', 'process.stdout.write("x".repeat(17 * 1024 * 1024))'], successExitCodes: [0, 1] }), /exceeded output limit/)
+  const stop = new AbortController(); stop.abort()
+  await assert.rejects(runProcess({ ...invocation, args: ['-e', 'setTimeout(()=>{},10000)'], signal: stop.signal, successExitCodes: [0, 1] }))
+})
+
+test('process success/visibility options reject invalid values before starting a tool', async () => {
+  const f = await fixture()
+  const invocation = { command: 'node', args: ['-e', 'require("node:fs").writeFileSync("unexpected-spawn", "bad")'], cwd: f.root, capture: true }
+  for (const value of [null, [], [0, -1], [0, 1.5], [Infinity], ['1'], '0', {}]) {
+    await assert.rejects(runProcess({ ...invocation, successExitCodes: value }), /Success exit codes/)
+  }
+  for (const value of [null, 'false', 0, {}]) {
+    await assert.rejects(runProcess({ ...invocation, windowsHide: value }), /windowsHide must be a boolean/)
+  }
+  assert.equal(existsSync(join(f.root, 'unexpected-spawn')), false)
+})

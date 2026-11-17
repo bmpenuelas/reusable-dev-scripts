@@ -14,6 +14,9 @@
 | VS Code publish | Publishes to the requested registries, defaulting to both |
 | Electron notarize | Submits an artifact to a remote service, then may staple it |
 | Cloudflare commands | Deploy code/files or change allowlisted Worker secrets |
+| `dev start` | Runs the configured processes until one exits; it cannot stop what a process spawns on its own |
+| `env generate` | Writes the files the project module returns, including secrets; keep them ignored by Git |
+| `prisma migrate` | Changes the schema of the database named by the generated environment file; protected environments need `--allow-production` and the typed or `--confirm-host` host |
 | `exec` and project hooks | Run exactly the requested tool/argv; they are not restricted to the other modules' effects |
 
 ## Protected environments

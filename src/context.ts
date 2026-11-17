@@ -43,7 +43,7 @@ export class Context {
     requireValue(this.dryRun || this.boolean('allow-production'), 'Production operation requires --allow-production')
     await this.hooks(this.config.production?.verify, this.root, platform)
   }
-  moduleRoot(key: 'vue' | 'capacitor' | 'android' | 'store' | 'electron' | 'swift' | 'vscode' | 'browser'): string {
+  moduleRoot(key: 'vue' | 'capacitor' | 'android' | 'store' | 'electron' | 'swift' | 'vscode' | 'browser' | 'dev' | 'prisma'): string {
     return this.path(this.config[key]?.root ?? '.')
   }
 }

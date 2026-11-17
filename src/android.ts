@@ -34,12 +34,19 @@ export async function androidBuild(ctx: Context, tasks: string[] = [], debug = f
   if (!tasks.length) {
     requireValue(ctx.dryRun || existsSync(artifact), 'Gradle completed without producing the configured artifact')
     ctx.log(`${ctx.dryRun ? '[plan]' : '[rds]'} Artifact: ${artifact}`)
-    if (ctx.boolean('reveal')) await reveal(ctx, artifact)
+    if (ctx.boolean('reveal')) {
+      // File-manager launch/exit status is not a build verification result.
+      // In particular, Explorer can return a nonzero status after handing off.
+      try { await reveal(ctx, artifact) }
+      catch { ctx.log('[rds] Warning: Artifact is ready, but automatic reveal could not be confirmed. Open the artifact path above manually.') }
+    }
   }
   return artifact
 }
 export async function reveal(ctx: Context, path: string) {
-  if (process.platform === 'win32') await ctx.run('explorer.exe', [`/select,${path}`], { label: 'Reveal artifact' })
+  // Explorer hands the request to the desktop shell and commonly exits 1 even
+  // when the file is revealed. Keep this convention local to this invocation.
+  if (process.platform === 'win32') await ctx.run('explorer.exe', [`/select,${path}`], { label: 'Reveal artifact', successExitCodes: [0, 1], windowsHide: false })
   else if (process.platform === 'darwin') await ctx.run('open', ['-R', path], { label: 'Reveal artifact' })
   else await ctx.run('xdg-open', [join(path, '..')], { label: 'Reveal artifact' })
 }

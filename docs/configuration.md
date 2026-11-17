@@ -197,3 +197,18 @@ export default {
 ```
 
 Select a target and explicit environment when invoking a Cloudflare command. Keep account configuration, domains, header policy and secret generation local. See [Cloudflare commands](commands.md#cloudflare) and the [safety model](safety.md) before deploying.
+
+## Local services, environment files and migrations
+
+A backend/frontend repository can replace its hand-written dev, wait, environment and migration scripts with four small sections. Project policy stays in the module referenced by `env.module`. See [services.config.mjs](../examples/services.config.mjs) and the [local development reference](commands.md#local-development).
+
+```js
+export default {
+  version: 1,
+  env: { module: 'scripts/environments.mjs' },
+  dev: { processes: [{ name: 'api', command: ['npm', 'run', 'dev', '--workspace', 'backend'] }] },
+  wait: { targets: { database: { variable: 'DATABASE_URL', envFile: 'backend/.env' } } },
+  prisma: { root: 'backend', envFile: 'backend/.env.{env}' },
+  production: { environments: ['production'], verify: [['rds', 'env', 'check', '--env', '{env}']] },
+}
+```

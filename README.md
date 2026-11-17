@@ -10,7 +10,7 @@ A collection of development and release automations that brings repeatable workf
 
 The [bundled skill](skills/reusable-dev-scripts/SKILL.md) ships in the npm package. Installation is explicit—no postinstall hook changes your agent configuration. For an agent that uses another project-local skills directory, select it with `--output`, as described in [skill installation](#install-the-agent-skill).
 
-- 🧩 **Automations for each framework and platform.** Vue, Capacitor, Android, mobile stores, VS Code extensions, Electron, Swift, Cloudflare, and browser extensions have their own commands.
+- 🧩 **Automations for each framework and platform.** Vue, Capacitor, Android, mobile stores, VS Code extensions, Electron, Swift, Cloudflare, and browser extensions have their own commands. Shared local-development mechanics (concurrent dev processes, service readiness, per-environment files, Prisma migrations) are one command family each.
 - 📱 **From web build to native artifact.** Synchronize native projects, manage versions, generate resources, capture screenshots, and build Android packages.
 - 📦 **Predictable release mechanics.** Validate store metadata, share Fastlane lanes, and publish the same VSIX to multiple registries.
 - 🛡️ **Explicit side effects.** Preview with dry-run, authorize protected environments, and keep credentials and application policy in your project.
@@ -167,6 +167,7 @@ Each command below starts with `rds`. Configure only the modules you use.
 | Native Swift | `swift icons`, `bundle` |
 | Cloudflare | `cloudflare deploy-worker`, `deploy-pages`, `push-secrets` |
 | Browser extensions | `browser package` |
+| Local development | `dev start`, `wait tcp`, `env template`, `validate`, `generate`, `check`, `prisma migrate`, `status` |
 
 Get exact supported flags without loading application configuration:
 
@@ -196,6 +197,8 @@ The application owns its tool versions. Install only what its selected module ne
 | Swift bundles/icons | macOS, Swift/Xcode command-line tools, explicit plist and entitlements |
 | Cloudflare | `wrangler`, existing deployment config, suitable account credentials |
 | Browser ZIP / image processing | Provided here; the app supplies built files/artwork |
+| Dev processes, TCP waits, environment files | Provided here; the app supplies commands, endpoints and an environment module |
+| Prisma migrations | `prisma` in the application, a generated environment file with the database URL |
 
 Fastlane lanes and a locked gem set ship with this package. Store commands use the consumer's `.rds/gems` cache—not global gem installations. Store metadata and credentials remain application-owned.
 
@@ -240,7 +243,7 @@ npm install --save-dev --save-exact reusable-dev-scripts@<version>
 To test the exact distributable without a link, run `npm pack` in the toolkit checkout, copy the resulting versioned tarball into the application's `vendor/` directory, and install it from the application:
 
 ```sh
-npm install --save-dev ./vendor/reusable-dev-scripts-0.1.2.tgz
+npm install --save-dev ./vendor/reusable-dev-scripts-0.2.0.tgz
 ```
 
 A tarball is a snapshot: rebuild, repack, and reinstall after toolkit changes. Use its actual versioned filename. A vendored tarball and lockfile can also provide a reproducible dependency before npm publication. See [design and development](docs/design.md) for the release checklist.

@@ -20,6 +20,9 @@ An alias named `lint` might only run a typechecker. A script named `bundle` migh
 | Swift macOS application | `swift` | Product/source variants, IDs, plist, entitlements |
 | Cloudflare deployment | `cloudflare` | Infrastructure and application configuration, domains, account policy |
 | Browser extension | `browser` | Build/copy recipe, manifest, browser-store submission |
+| Local development loop | `dev`, `wait` | Which processes exist, their commands, and what "ready" means for the application |
+| Per-environment settings | `env` | Defaults, validation rules and generated file formats, kept in one project module |
+| Prisma migrations on remote databases | `prisma` | Where the database URL comes from and any stronger production approval |
 
 One repository can use several modules. There is no single project preset to select, and optional modules do not need configuration until used.
 
@@ -97,5 +100,9 @@ Keep an acceptance record of commands and artifact checks, without credentials o
 | Export localized iOS text | `rds store export --platform ios` |
 | Package a VS Code extension | `rds vscode package` |
 | Publish the same VSIX to both registries | `rds vscode publish --registry all` |
+| Start API and frontend together | `rds dev start` |
+| Wait for a database before migrating | `rds wait tcp --target database` |
+| Template, validate and generate environment files | `rds env template|validate|generate|check --env <name>` |
+| Migrate a staging or production database | `rds prisma migrate --env staging` |
 
 See the [agent playbook](agents.md) for automated integration and the [safety model](safety.md) before side-effecting operations.

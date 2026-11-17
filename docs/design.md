@@ -18,10 +18,14 @@ The CLI separates workflows by project kind. A change for a Swift bundle should 
 | [src/store.ts](../src/store.ts) / [support/store](../support/store/) | Metadata checks, locked shared Fastlane lanes and Ruby invocation |
 | [src/desktop.ts](../src/desktop.ts) | Separate Electron and Swift operations |
 | [src/extensions.ts](../src/extensions.ts) / [src/cloudflare.ts](../src/cloudflare.ts) | Extension publication and explicit deployment targets |
+| [src/dev.ts](../src/dev.ts) / [src/wait.ts](../src/wait.ts) | Concurrent prefixed dev processes and TCP readiness waits |
+| [src/env.ts](../src/env.ts) / [src/prisma.ts](../src/prisma.ts) | Per-environment file lifecycle around a project module, and Prisma migrations from a generated file |
 | `test/` (repository checkout) | Synthetic consumer fixtures and regression tests |
 | `scripts/smoke-package.mjs` (repository checkout) | Packed distribution/API/CLI consumer checks |
 
 Source is TypeScript; `npm run build` emits JavaScript and declarations to ignored `dist/`. The npm file allowlist ships the executable, compiled modules, shared support files, reference source, agent guidance, examples and docs—not development caches or private configuration. Consumers execute `dist/`; shipped source is for inspection, not an additional compilation requirement.
+
+Process invocations require exit code 0 unless `Invocation.successExitCodes` explicitly lists a tool-specific success convention. Only Windows Explorer reveal currently opts into `[0, 1]`; Gradle, ADB, Capacitor, macOS `open`, Linux `xdg-open` and other tools remain strict. Launch errors, timeouts, output-limit failures and cancellation cannot be converted to success by this list. `Invocation.windowsHide` defaults to true for background tools; Explorer reveal explicitly requests false so its window is visible. These are typed process options, not new configuration fields or CLI flags.
 
 ## Make a change
 

@@ -99,7 +99,7 @@ A target can map native keys to catalogue keys using `keys: { native_key: 'catal
 
 `android.root` defaults to `<capacitor.root>/android`; optional `module` defaults to `app`. Optional `javaHome` and `sdkRoot` override standard environment variables. Otherwise Android Studio's bundled JDK is discovered. `appId` enables install verification and explicit replacement. `apk`, `aab`, `mapping` can override artifact paths relative to Android root.
 
-- `build --configuration debug|release --format apk|aab [--clean] [--reveal]`: runs Gradle and verifies the expected artifact. Defaults to release AAB. Custom Gradle tasks can follow `--`; artifact inference is skipped for them.
+- `build --configuration debug|release --format apk|aab [--clean] [--reveal]`: runs Gradle and verifies the expected artifact. Defaults to release AAB. `--reveal` is a best-effort file-manager action after verification. Windows Explorer launches visibly and its normal shell-handoff exit codes 0 and 1 are accepted without a warning; a genuine launch/other-exit failure logs a warning and leaves the successful build successful. Other tools still require exit code 0. Gradle failures and missing artifacts still fail the command. Custom Gradle tasks can follow `--`; artifact inference and reveal are skipped for them.
 - `install [--artifact <config-root-relative-apk>] [--device <serial>] [--physical] [--replace]`: installs an **already built** debug/custom APK and verifies it. No build, sync, uninstall, launch, or version bump is implicit.
 - `start-adb`: starts the ADB server using the configured SDK or consumer PATH and Android environment. No device, app ID or native project is required. It does not select/install/uninstall an app. Dry-run plans the operation; protected environments still require authorization.
 
@@ -154,3 +154,61 @@ Select `--target` when more than one exists. **Explicit `--env` is required**. W
 - `push-secrets`: reads dotenv/JSON, checks an explicit name allowlist, sends JSON on stdin to `wrangler secret bulk`. Other variables cannot be uploaded.
 
 No infrastructure provisioning, database wiping, app configuration generation or account inference is performed. Preserve existing security/header/domain policy in the consuming project.
+
+## Local development
+
+These families cover the mechanics most projects rewrite for local work. They hold no application policy: commands, endpoints, defaults and validation rules come from your configuration or your own module.
+
+### Tool resolution
+
+Commands and hooks resolve `pnpm` through the running pnpm when rds was started by it, so `rds exec -- pnpm …` and `dev.processes` work on Windows without a `.cmd` shim. `rds` resolves to the installed toolkit's own CLI, which allows a hook such as `['rds', 'env', 'check', '--env', '{env}']`. On Windows a bare command name is looked up on `PATH` as `.exe`, `.cmd` or `.bat` the way a shell would, and batch files keep the existing argument checks.
+
+### Dev processes
+
+`rds dev start`
+
+`dev: { root?, processes: [{ name, command, root?, environment? }] }`. Every process starts at once with an argv `command`, run in `dev.root` (or the process `root` inside it), and its output is printed line by line with a colored `[name]` prefix. `environment` accepts the same `{env}` / `{root}` placeholders as other environment mappings, and `FORCE_COLOR=1` is set so tools keep their colors in a pipe.
+
+The first process to end ends the session: the others receive SIGTERM and the result is the first process's result. Ctrl+C is a normal stop and exits 0. Dry-run lists the processes without starting them. Names must be unique. Add `--env` to select the value of `{env}`.
+
+### Waiting for a service
+
+`rds wait tcp [--target <name>] [--timeout <seconds>]`
+
+`wait: { targets: { <name>: { host?, port?, url?, variable?, envFile?, timeout?, hint? } } }`. A target is a `host` and `port`, a `url`, or a `variable` holding a URL, read from the process environment first and then from `envFile` (dotenv, relative to the config root). The port falls back to the scheme default for HTTP, MySQL, PostgreSQL, Redis, MongoDB and AMQP. `--target` is optional when there is a single target. The default timeout is 90 seconds, retried every second.
+
+Only the host and port are printed, never the URL or its credentials. `hint` is appended to the failure message. Dry-run does not connect.
+
+### Environment files
+
+`rds env template|validate|generate|check --env <name>`
+
+`env: { module, directory?, environments?, autoCreate?, hints? }`. Each environment has an editable, uncommitted file at `<directory>/<name>.json5` (default `.gitignored/environments`; comments and trailing commas are allowed) and one or more generated files. `--env` is mandatory and must be one of `environments` (default `development`, `staging`, `production`).
+
+The project owns policy in the module named by `module`, an ES module relative to the config root:
+
+```js
+import { randomSecret } from 'reusable-dev-scripts'
+
+export const defaults = (env) => ({
+  apiUrl: env === 'development' ? 'http://localhost:3000' : null,
+  jwtSecret: randomSecret(),
+})
+export const validate = (env, config) => (config.jwtSecret.length < 32 ? ['jwtSecret must be at least 32 characters'] : [])
+export const outputs = (env, config) => [{ path: `.env.${env}`, content: `API_URL=${config.apiUrl}\n` }]
+```
+
+- `template` creates or extends the file: existing values always win, new defaults are merged in, and a `null` marks a value a human must supply. Comments are not preserved when the file is rewritten.
+- `validate` fails for every remaining `null` and for each problem returned by `validate`.
+- `generate` validates, then writes the files returned by `outputs`. Only environments listed in `autoCreate` (default `development`) create a missing editable file; others stop with the command from `hints.template`.
+- `check` validates and fails if a generated file is missing or differs, naming the command from `hints.generate`. It never writes, so it is suitable for `production.verify`.
+
+`hints` customizes the commands shown in messages, for example `{ generate: 'pnpm {env}:generate' }`. `parseJson5`, `mergeDefaults` and `randomSecret` are exported for modules and scripts that read the same files. Generated files contain secrets: keep them and the editable files ignored by Git. Dry-run plans writes without performing them.
+
+### Prisma migrations
+
+`rds prisma migrate|status --env <name> [--confirm-host <host>]`
+
+`prisma: { root?, envFile, variable? }`. The database URL is read from `variable` (default `DATABASE_URL`) in `envFile`, a dotenv path relative to the config root where `{env}` becomes the environment. Generate that file first, for example with `rds env generate`. `migrate` runs `prisma migrate deploy` and `status` runs `prisma migrate status` from `root`, using the project's own `prisma` package. The URL is handed to Prisma through its environment, never logged; the host is shown.
+
+`migrate` is a mutation guard: a protected environment needs `--allow-production` and passes the production verification hooks. It then needs the database host as confirmation, either typed at the prompt or given as `--confirm-host`; without a terminal the flag is required. A host that does not match stops the command before Prisma starts. Local development databases keep using your own `prisma migrate dev` script. Dry-run plans without reading anything beyond the environment file.

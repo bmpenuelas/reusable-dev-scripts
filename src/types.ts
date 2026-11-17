@@ -1,7 +1,8 @@
 export type Command = readonly [string, ...string[]]
 export type Hooks = { prepare?: Command[]; prepareByEnv?: Record<string, Command[]>; build?: Command; buildByPlatform?: Partial<Record<'android' | 'ios', Command>>; environment?: Record<string, string>; environmentByPlatform?: Partial<Record<'android' | 'ios', Record<string, string>>>; afterBuild?: Command[]; afterSync?: Command[]; verify?: Command[] }
 export type Flags = Record<string, string | boolean>
-export interface Invocation { command: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; input?: string; capture?: boolean; label?: string; timeout?: number; signal?: AbortSignal }
+/** `prefix` streams each output line with that prefix instead of inheriting stdio (used by concurrent runs). */
+export interface Invocation { command: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; input?: string; capture?: boolean; label?: string; timeout?: number; signal?: AbortSignal; prefix?: string; /** Defaults to [0]; only opt into a tool's documented nonzero success convention. */ successExitCodes?: readonly number[]; /** Defaults to true; explicit GUI launches can request a visible window. */ windowsHide?: boolean }
 export interface Result { stdout: string; stderr: string }
 export type Runner = (invocation: Invocation) => Promise<Result>
 export interface Images { source: string; background?: string; outputs?: { path: string; width: number; height?: number }[] }
@@ -19,4 +20,23 @@ export interface Config {
   vscode?: { root?: string; prepare?: Command[]; noDependencies?: boolean; output?: string };
   cloudflare?: { targets: Record<string, { kind: 'worker' | 'pages'; root?: string; config?: string; directory?: string; projectName?: string; secretsFile?: string; secretNames?: string[]; prepare?: Command[] }> };
   browser?: { root?: string; directory: string; output: string; prepare?: Command[] };
+  dev?: { root?: string; processes: DevProcess[] };
+  wait?: { targets: Record<string, WaitTarget> };
+  env?: { directory?: string; module: string; environments?: string[]; autoCreate?: string[]; hints?: { template?: string; generate?: string } };
+  prisma?: { root?: string; envFile: string; variable?: string };
+}
+/** One long-running process started by `dev start`. `root` is relative to `dev.root`. */
+export interface DevProcess { name: string; command: Command; root?: string; environment?: Record<string, string> }
+/** A TCP endpoint: explicit `host`/`port`, a `url`, or a URL read from `variable` (process environment, then `envFile`). */
+export interface WaitTarget { host?: string; port?: number; url?: string; variable?: string; envFile?: string; timeout?: number; hint?: string }
+/** Contract of the project module named by `env.module`. Project policy (defaults, rules, file formats) stays in that module. */
+export interface EnvModule {
+  /** Default configuration for one environment. `null` marks a value a human must supply. */
+  defaults(environment: string): Record<string, unknown>;
+  /** Extra project rules. Return human-readable problems; an empty list means valid. */
+  validate?(environment: string, config: Record<string, unknown>): string[];
+  /** Generated files for one environment; `path` is relative to the config root. */
+  outputs?(environment: string, config: Record<string, unknown>): { path: string; content: string }[];
+  /** Optional first comment lines of the editable file. */
+  header?(environment: string): string[];
 }
