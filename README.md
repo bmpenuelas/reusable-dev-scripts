@@ -161,11 +161,12 @@ Each command below starts with `rds`. Configure only the modules you use.
 | Vue/Vite | `vue build` |
 | Capacitor | `capacitor sync`, `copy`, `open`, `live`, `versions`, `prepare`, `assets`, `locales`, `screenshots` |
 | Android | `android build`, `install`, `start-adb` |
-| Mobile stores | `store scaffold`, `check`, `changelog`, `export`, `upload-listing`, `upload-build`, `pull`, `doctor`, `run` |
+| Mobile stores | `store scaffold`, `check`, `changelog`, `export`, `upload-listing`, `upload-build`, `pull`, `doctor`, `verify`, `run` |
 | VS Code | `vscode package`, `publish` |
 | Electron | `electron dev`, `assets`, `clean`, `build`, `notarize` |
 | Native Swift | `swift icons`, `bundle` |
-| Cloudflare | `cloudflare deploy-worker`, `deploy-pages`, `push-secrets` |
+| Cloudflare | `cloudflare setup-pages`, `deploy-worker`, `deploy-pages`, `push-secrets` |
+| Hostinger | `hostinger setup`, `deploy` |
 | Browser extensions | `browser package` |
 | Local development | `dev start`, `wait tcp`, `env template`, `validate`, `generate`, `check`, `prisma migrate`, `status` |
 
@@ -271,3 +272,7 @@ See [design and development](docs/design.md) for module layout and the public re
 ## License
 
 [MIT](LICENSE). Dependency licenses remain their respective owners' terms.
+
+## Hosting automation
+
+Cloudflare Pages project creation and Hostinger Web/Cloud deployment mechanics are shared commands. See [the hosting guide](docs/hosting.md) for typed targets, credentials, dry-run behavior, provider prerequisites, and safety boundaries. Application seeds, mock/demo policy, database migrations at build time, and content-retention decisions remain in the consuming project.

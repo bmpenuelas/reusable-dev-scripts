@@ -66,3 +66,7 @@ Relevant external interfaces:
 6. Build the versioned tarball with `npm pack`, inspect its contents, and install it in an isolated consumer. Commit lockfile/config changes as appropriate; `rds` never commits or publishes the toolkit for you.
 
 Keep machine-specific paths and credentials in ignored local files or CI secret stores. Public fixtures and examples must use synthetic names and relative paths.
+
+## Hosting automation
+
+Cloudflare Pages project creation and Hostinger Web/Cloud deployment mechanics are shared commands. See [the hosting guide](hosting.md) for typed targets, credentials, dry-run behavior, provider prerequisites, and safety boundaries. Application seeds, mock/demo policy, database migrations at build time, and content-retention decisions remain in the consuming project.

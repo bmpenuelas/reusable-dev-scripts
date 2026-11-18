@@ -10,7 +10,7 @@
 | Native version synchronization | Writes version settings; `--bump` also changes package/lockfile versions |
 | Android install | Replaces an installed APK with `adb install -r`; `--replace` explicitly uninstalls first and deletes local app data |
 | Screenshots | Writes captures/resized files; opening a session can build and install the app |
-| Store commands | `check` is local; `doctor` reads remote account state; listing/build uploads and pull perform their documented remote/local effects |
+| Store commands | `check` is local; `doctor` and `verify` read remote account state (`verify` aborts its Play edit and changes nothing); listing/build uploads and pull perform their documented remote/local effects |
 | VS Code publish | Publishes to the requested registries, defaulting to both |
 | Electron notarize | Submits an artifact to a remote service, then may staple it |
 | Cloudflare commands | Deploy code/files or change allowlisted Worker secrets |
@@ -47,4 +47,4 @@ One explicit read-only-reference exception exists: `store.allowExternalCredentia
 
 JavaScript executables resolve from consumer dependencies. The process runner passes argv without a shell; validated Windows batch wrappers are the exception needed to invoke native batch scripts. An explicit `exec` or hook can still choose a shell—do not treat argv validation as isolation from trusted commands.
 
-No automatic Git mutations, public mobile-store rollout, review submission, or Electron publishing are implemented. Store binary uploads are internal-only. The pinned Fastlane rules are a maintained snapshot: review current store requirements when updating or preparing a release.
+No automatic Git mutations, public mobile-store rollout, review submission, or Electron publishing are implemented. Store binary uploads are internal-only: the Play internal track (`completed` by default, `--status draft` to hold it back) and TestFlight internal testers are the only things made available instantly. Listing uploads only fill the drafts and never change a release's status or submit a version for review. (Google Play publishes listing edits straight away when an app has Managed publishing turned off; turn it on in the Play Console if listing changes must wait for review.) The pinned Fastlane rules are a maintained snapshot: review current store requirements when updating or preparing a release.

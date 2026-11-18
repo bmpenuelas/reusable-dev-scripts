@@ -2,15 +2,19 @@
 # Invoke through `rds store`; see docs/commands.md for options and directory layouts.
 #
 # Listing lanes run scoped metadata checks before uploading. Only the `internal` lanes upload
-# a build, and only for internal testers (Play internal testing, TestFlight).
-# Nothing here submits an app for review or implicitly commits version files.
+# a build, and only for internal testers (Play internal testing, TestFlight), who get it as soon
+# as the store has processed it. Everything else only fills the draft: no lane touches a release's
+# status, sends a version for review, or implicitly commits version files.
 skip_docs
 default_platform(:android)
 
 require 'json'
-fastlane_dir = File.join(ENV.fetch('RDS_STORE_ROOT'), 'fastlane')
-store_dir = ENV.fetch('RDS_STORE_ROOT')
-repo_root = ENV.fetch('RDS_PROJECT_ROOT')
+require File.join(ENV.fetch('RDS_STORE_SUPPORT'), 'verify.rb')
+# Forward slashes everywhere: deliver and supply find locale folders with Dir.glob, which treats the
+# backslashes of a Windows path as escapes and silently matches nothing (no text or images uploaded).
+store_dir = ENV.fetch('RDS_STORE_ROOT').tr("\\", "/")
+fastlane_dir = File.join(store_dir, 'fastlane')
+repo_root = ENV.fetch('RDS_PROJECT_ROOT').tr("\\", "/")
 check_script = ENV.fetch('RDS_CLI_ENTRY')
 key_path = ->(env_name, default) { File.expand_path(ENV[env_name] || default, store_dir) }
 
@@ -83,18 +87,21 @@ platform :android do
   # Uploads the bundle built by `npm run android:play:bundle` (`npm run android:play:internal` does
   # both) and rolls it out to the internal testers, with the R8 mapping for deobfuscated crashes.
   # Release notes come from changelogs/<versionCode>.txt in each language that has one.
-  # `status:draft` leaves the release as a draft (required while the app has never been published).
+  # Internal testers get the build immediately (`completed`, the default). `status:draft` leaves the
+  # release as a draft instead (required while the app has never been published).
   desc "Upload the release bundle to the internal testing track"
   lane :internal do |options|
     require_key.call(play_key, "Google Play service account key")
     outputs = File.join(repo_root, "android", "app", "build", "outputs")
     aab = ENV.fetch("RDS_ANDROID_AAB")
     UI.user_error!("No bundle at #{aab}: run rds android build --format aab first") unless File.exist?(aab)
+    status = options[:status] || "completed"
+    UI.user_error!("status must be draft or completed") unless %w[draft completed].include?(status)
     mapping = ENV.fetch("RDS_ANDROID_MAPPING")
     params = {
       track: "internal",
       aab: aab,
-      release_status: options[:status] || "completed",
+      release_status: status,
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_changelogs: options[:changelogs] == false,
@@ -111,7 +118,14 @@ platform :android do
   desc "Download the live listing into fastlane/downloaded/android to compare with the local files"
   lane :pull do
     require_key.call(play_key, "Google Play service account key")
-    download_from_play_store(metadata_path: "./fastlane/downloaded/android")
+    download_from_play_store(metadata_path: File.join(fastlane_dir, "downloaded/android"))
+  end
+
+  # Read-only: opens a Play edit, compares and aborts it. `scope:text|media|all` (default all).
+  desc "Compare the local listing text and graphics with the Google Play draft (read-only, fails on any difference)"
+  lane :verify do |options|
+    require_key.call(play_key, "Google Play service account key")
+    UI.user_error!("The Google Play draft differs from the local files") unless RdsStoreVerify.android(key: play_key, scope: options[:scope] || "all", root: store_dir)
   end
 
   desc "Check the Play key works and show the releases on each track"
@@ -136,6 +150,7 @@ platform :ios do
     require_key.call(apple_key, "App Store Connect API key")
     params = {
       api_key_path: apple_key,
+      app_identifier: bundle_id.call,
       metadata_path: File.join(fastlane_dir, "metadata/ios"),
       screenshots_path: File.join(fastlane_dir, "screenshots"),
       skip_binary_upload: true,
@@ -228,6 +243,14 @@ platform :ios do
     sh("bundle", "exec", "fastlane", "deliver", "download_metadata",
        "--api_key_path", apple_key, "--app_identifier", bundle_id.call,
        "--metadata_path", File.join(fastlane_dir, "downloaded", "ios"), "--force")
+  end
+
+  # Read-only: queries the editable version. `scope:text|media|all` (default all).
+  desc "Compare the local listing text, screenshots and previews with the App Store Connect draft (read-only, fails on any difference)"
+  lane :verify do |options|
+    require_key.call(apple_key, "App Store Connect API key")
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(filepath: File.expand_path(apple_key))
+    UI.user_error!("The App Store Connect draft differs from the local files") unless RdsStoreVerify.ios(bundle_id: bundle_id.call, scope: options[:scope] || "all", root: store_dir)
   end
 
   desc "Check the App Store Connect key works and show the version being prepared"

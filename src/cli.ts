@@ -12,6 +12,8 @@ import { screenshots } from './screenshots.js'
 import { store } from './store.js'
 import { vscode, browserPackage } from './extensions.js'
 import { cloudflare } from './cloudflare.js'
+import { hostinger } from './hostinger.js'
+import { hostingReset } from './hosting-reset.js'
 import { electron, swift } from './desktop.js'
 import { installSkill } from './skill.js'
 import { devStart } from './dev.js'
@@ -23,8 +25,8 @@ import type { Flags, Runner } from './types.js'
 type OptionKind = 'boolean' | 'string'
 const globalOptions: Record<string, OptionKind> = { cwd: 'string', config: 'string', env: 'string', 'dry-run': 'boolean', 'allow-production': 'boolean', banner: 'boolean', 'no-banner': 'boolean', help: 'boolean' }
 const options: Record<string, OptionKind> = Object.fromEntries([
-  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch', 'timeout', 'confirm-host'].map(key => [key, 'string'] as const),
-  ...['open', 'skip-build', 'skip-typecheck', 'check', 'bump-build', 'https', 'skip-sync', 'clean', 'reveal', 'physical', 'replace', 'force', 'guided', 'strict', 'all-locales', 'include-changelogs', 'no-dependencies', 'unsigned', 'preflight'].map(key => [key, 'boolean'] as const),
+  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch', 'timeout', 'confirm-host', 'confirm-project', 'hostinger-target', 'pages-target'].map(key => [key, 'string'] as const),
+  ...['open', 'skip-build', 'skip-typecheck', 'check', 'bump-build', 'https', 'skip-sync', 'clean', 'reveal', 'physical', 'replace', 'force', 'guided', 'strict', 'all-locales', 'include-changelogs', 'no-dependencies', 'unsigned', 'preflight', 'yes', 'resume', 'keep-pages'].map(key => [key, 'boolean'] as const),
   ...Object.entries(globalOptions)
 ])
 export const commands: Record<string, string[]> = {
@@ -47,11 +49,16 @@ export const commands: Record<string, string[]> = {
   'store changelog': ['version-code', 'text', 'force'], 'store export': ['platform', 'output', 'format'],
   'store upload-listing': ['platform', 'only', 'include-changelogs', 'all-locales'],
   'store upload-build': ['platform', 'track', 'status', 'groups', 'all-locales'],
-  'store pull': ['platform'], 'store doctor': ['platform'], 'store run': [],
+  'store pull': ['platform'], 'store doctor': ['platform'], 'store verify': ['platform', 'scope'],'store run': [],
   'vscode package': ['output', 'no-dependencies'], 'vscode publish': ['output', 'registry', 'bump', 'no-dependencies'],
   'electron dev': [], 'electron assets': ['check'], 'electron clean': [], 'electron build': ['platform', 'arch', 'format', 'clean', 'unsigned'],
   'electron notarize': ['artifact', 'profile', 'preflight'],
   'swift icons': [], 'swift bundle': ['open'],
+  'cloudflare setup-pages': ['target', 'yes'],
+  'hosting reset': ['hostinger-target', 'pages-target', 'confirm-host', 'confirm-project', 'output', 'check', 'yes', 'resume'],
+  'hosting drop': ['hostinger-target', 'pages-target', 'confirm-host', 'confirm-project', 'output', 'check', 'yes', 'resume', 'keep-pages'],
+  'hosting recreate': ['hostinger-target', 'pages-target', 'confirm-host', 'confirm-project', 'output', 'check', 'yes', 'resume', 'keep-pages'],
+  'hostinger setup': ['target', 'yes'], 'hostinger deploy': ['target', 'yes'],
   'cloudflare deploy-worker': ['target'], 'cloudflare deploy-pages': ['target', 'branch'], 'cloudflare push-secrets': ['target'],
   'browser package': ['output'],
   'dev start': [], 'wait tcp': ['target', 'timeout'],
@@ -79,7 +86,8 @@ export function parse(argv: string[]) {
   return { key, flags, forwarded }
 }
 export function help(key = ''): string {
-  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${['exec', 'vue build', 'android build', 'store run'].includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}${key === 'android build' ? '--reveal is best-effort; file-manager failure only warns after a verified build.\n' : ''}`
+  if (key === 'hosting reset') return 'rds hosting reset\nOptions: --env <unprotected> --dry-run --check --yes --confirm-host <domain> --confirm-project <project> --hostinger-target <name> --pages-target <name> --output <journal> --resume\nPermanently delete/recreate exact hosted resources. Protected environments are forbidden. Temporary domains change automatically. Consumer deployment remains separate.\n'
+  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${['exec', 'vue build', 'android build', 'store run'].includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}${key === 'android build' ? '--reveal is best-effort; file-manager failure only warns after a verified build.\n' : ''}${key === 'android install' ? 'android.appId must match the APK application ID, including any debug suffix. --replace deletes only that configured package and its data.\n' : ''}`
   return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production --banner --no-banner\nResult banners default to on; configure output.banners or RDS_BANNERS=0|1.\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
 }
 export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log, onContext?: (ctx: Context) => void): Promise<Context | undefined> {
@@ -121,6 +129,8 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
     case 'electron': await electron(ctx, action!); break
     case 'swift': await swift(ctx, action!); break
     case 'cloudflare': await cloudflare(ctx, action!); break
+    case 'hosting': await hostingReset(ctx, undefined, undefined, action as 'reset' | 'drop' | 'recreate'); break
+    case 'hostinger': await hostinger(ctx, action!); break
     case 'browser': await browserPackage(ctx); break
     case 'dev': await devStart(ctx); break
     case 'wait': await waitTcp(ctx); break

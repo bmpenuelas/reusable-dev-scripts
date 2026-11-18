@@ -10,7 +10,7 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'hostinger']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
     if (key !== 'version') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
@@ -23,7 +23,7 @@ export function validateConfig(value: unknown): Config {
     store: ['root', 'locales', 'appLocales', 'defaultLocale', 'defaultLocales', 'iosDevices', 'androidId', 'iosId', 'appleKey', 'playKey', 'allowExternalCredentials', 'iosProject', 'iosScheme', 'hooks', 'versionPackage'],
     electron: ['root', 'url', 'start', 'assets', 'output', 'builderConfig', 'notaryProfile', 'prepare'],
     swift: ['root', 'executable', 'plist', 'resources', 'entitlements', 'output', 'identity', 'icon', 'iconOutput'],
-    vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets'], browser: ['root', 'directory', 'output', 'prepare'],
+    vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets', 'credentialsFile'], hostinger: ['targets', 'credentialsFile'], browser: ['root', 'directory', 'output', 'prepare'],
     dev: ['root', 'processes'], wait: ['targets'], env: ['directory', 'module', 'environments', 'autoCreate', 'hints'], prisma: ['root', 'envFile', 'variable']
   }
   const keys = (entry: unknown, allowed: string[], label: string) => {
@@ -48,7 +48,36 @@ export function validateConfig(value: unknown): Config {
   keys(config.store?.hooks, ['beforeUpload'], 'store.hooks')
   keys(config.store?.iosDevices, ['iphone', 'ipad', 'watch'], 'store.iosDevices')
   if (config.production?.environments) requireValue(Array.isArray(config.production.environments) && config.production.environments.length > 0 && config.production.environments.every(x => typeof x === 'string' && x.length), 'production.environments must be a non-empty string array')
-  for (const target of Object.values(config.cloudflare?.targets ?? {})) keys(target, ['kind', 'root', 'config', 'directory', 'projectName', 'secretsFile', 'secretNames', 'prepare'], 'Cloudflare target')
+  const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'prepare']
+  const hostingerFields = ['domain', 'username', 'directory', 'envFile', 'excludeEnv', 'databaseVariable', 'nodeVersion', 'entryFile', 'buildScript', 'cron']
+  for (const [provider, fields] of [[config.cloudflare, cloudflareFields], [config.hostinger, hostingerFields]] as const) {
+    if (!provider) continue
+    requireValue(provider.targets && typeof provider.targets === 'object' && !Array.isArray(provider.targets), 'Provider targets must be an object')
+    if (provider.credentialsFile !== undefined) requireValue(typeof provider.credentialsFile === 'string' && provider.credentialsFile.length > 0, 'credentialsFile must be a non-empty filename')
+    for (const target of Object.values(provider.targets)) {
+      keys(target, [...fields, 'environments'], 'provider target')
+      if (target.environments !== undefined) requireValue(target.environments && typeof target.environments === 'object' && !Array.isArray(target.environments), 'Target environments must be an object')
+      for (const [environment, override] of Object.entries(target.environments ?? {})) {
+        requireValue(/^[a-zA-Z][\w-]*$/u.test(environment), 'Invalid target environment')
+        keys(override, [...fields], 'provider environment')
+      }
+      for (const settings of [target, ...Object.values(target.environments ?? {})]) {
+        for (const [key, value] of Object.entries(settings)) {
+          if (key === 'environments') continue
+          if (key === 'prepare') { hookList(value); continue }
+          if (['domains', 'excludeEnv', 'secretNames'].includes(key)) { requireValue(Array.isArray(value) && value.every(x => typeof x === 'string' && x.length), key + ' must be a string array'); continue }
+          if (key === 'nodeVersion') { requireValue([22, 24].includes(value as number), 'Hostinger nodeVersion must be 22 or 24'); continue }
+          if (key === 'cron') {
+            keys(value, ['command', 'schedule'], 'Hostinger cron')
+            const cron = value as { command?: unknown; schedule?: unknown }
+            requireValue(typeof cron?.command === 'string' && cron.command.length > 0 && typeof cron.schedule === 'string' && cron.schedule.length > 0, 'Hostinger cron needs command and schedule')
+            continue
+          }
+          requireValue(typeof value === 'string' && value.length > 0 && !value.includes('\0'), key + ' must be a non-empty string')
+        }
+      }
+    }
+  }
   keys(config.env?.hints, ['template', 'generate'], 'env.hints')
   if (config.dev) {
     requireValue(Array.isArray(config.dev.processes) && config.dev.processes.length > 0, 'dev.processes must be a non-empty array')

@@ -50,15 +50,15 @@ export async function reveal(ctx: Context, path: string) {
   else if (process.platform === 'darwin') await ctx.run('open', ['-R', path], { label: 'Reveal artifact' })
   else await ctx.run('xdg-open', [join(path, '..')], { label: 'Reveal artifact' })
 }
-export async function adb(ctx: Context, args: string[], capture = true) {
+export async function adb(ctx: Context, args: string[], capture = true, label = 'Run Android Debug Bridge command') {
   const env = androidEnvironment(ctx), sdk = ctx.config.android?.sdkRoot ?? env.ANDROID_SDK_ROOT
   const binary = sdk ? join(sdk, 'platform-tools', process.platform === 'win32' ? 'adb.exe' : 'adb') : 'adb'
-  return ctx.run(binary, args, { env, capture, label: 'Android device operation' })
+  return ctx.run(binary, args, { env, capture, label })
 }
 export async function androidStartAdb(ctx: Context) {
   await ctx.guard(ctx.root, 'android')
   // Starting the daemon needs neither a native project nor a selected device.
-  await adb(ctx, ['start-server'], false)
+  await adb(ctx, ['start-server'], false, 'Start Android Debug Bridge server')
 }
 export function selectDevice(output: string, requested: string, physical = false): string {
   const devices = output.split(/\r?\n/u).map(line => line.trim().split(/\s+/u)).filter(parts => parts[1] === 'device').map(parts => parts[0]!).filter(id => !physical || !id.startsWith('emulator-'))
@@ -68,7 +68,7 @@ export function selectDevice(output: string, requested: string, physical = false
 }
 export async function device(ctx: Context): Promise<string> {
   if (ctx.dryRun) return ctx.string('device', '<device>')
-  return selectDevice((await adb(ctx, ['devices'])).stdout, ctx.string('device'), ctx.boolean('physical'))
+  return selectDevice((await adb(ctx, ['devices'], true, 'List Android devices')).stdout, ctx.string('device'), ctx.boolean('physical'))
 }
 export async function androidInstall(ctx: Context) {
   await ctx.guard(androidRoot(ctx), 'android')
@@ -78,13 +78,13 @@ export async function androidInstall(ctx: Context) {
   if (ctx.boolean('replace')) {
     const appId = ctx.config.android?.appId; requireValue(appId && /^[\w.]+$/u.test(appId), 'Configure android.appId before replacing an installation')
     ctx.log('[rds] Explicit replacement removes the installed app and its local data')
-    const installed = await adb(ctx, ['-s', id, 'shell', 'pm', 'path', appId])
-    if (ctx.dryRun || /^package:/mu.test(installed.stdout)) await adb(ctx, ['-s', id, 'uninstall', appId])
+    const installed = await adb(ctx, ['-s', id, 'shell', 'pm', 'path', appId], true, 'Check existing Android installation')
+    if (ctx.dryRun || /^package:/mu.test(installed.stdout)) await adb(ctx, ['-s', id, 'uninstall', appId], true, 'Remove existing Android installation')
   }
-  const result = await adb(ctx, ['-s', id, 'install', '-r', apk])
+  const result = await adb(ctx, ['-s', id, 'install', '-r', apk], true, 'Install Android APK')
   requireValue(ctx.dryRun || /^Success\s*$/mu.test(result.stdout), 'ADB did not confirm successful installation')
   if (ctx.config.android?.appId) {
-    const verified = await adb(ctx, ['-s', id, 'shell', 'pm', 'path', ctx.config.android.appId])
+    const verified = await adb(ctx, ['-s', id, 'shell', 'pm', 'path', ctx.config.android.appId], true, 'Verify installed Android package')
     requireValue(ctx.dryRun || /^package:/mu.test(verified.stdout), 'Installed Android package could not be verified')
   }
 }

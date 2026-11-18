@@ -50,8 +50,10 @@ export async function screenshots(ctx: Context) {
     if (platform === 'ios') await ctx.run('xcrun', ['simctl', 'io', id, 'screenshot', path], { label: 'Capture iOS screenshot' })
     else {
       const remote = `/sdcard/rds-${process.pid}-${Date.now()}.png`
-      try { await adb(ctx, ['-s', id, 'shell', 'screencap', '-p', remote]); await adb(ctx, ['-s', id, 'pull', remote, path]) }
-      finally { await adb(ctx, ['-s', id, 'shell', 'rm', remote]) }
+      try {
+        await adb(ctx, ['-s', id, 'shell', 'screencap', '-p', remote], true, 'Capture Android screenshot')
+        await adb(ctx, ['-s', id, 'pull', remote, path], true, 'Pull Android screenshot')
+      } finally { await adb(ctx, ['-s', id, 'shell', 'rm', remote], true, 'Remove remote Android screenshot') }
     }
     requireValue(ctx.dryRun || existsSync(path), 'Screenshot was not produced')
   }

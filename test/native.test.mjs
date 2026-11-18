@@ -103,6 +103,11 @@ test('native asset generator uses documented assetPath and detects tampering', a
   await capacitorAssets(f.ctx); assert.ok(f.calls[0].args.includes('--assetPath')); assert.ok(!f.calls[0].args.includes('--iconPath'))
   f.ctx.flags.check = true; await capacitorAssets(f.ctx); await f.file('android/app/src/main/res/mipmap-hdpi/ic_launcher.png', 'tampered'); await assert.rejects(capacitorAssets(f.ctx), /modified/)
 })
+test('Android screenshot capture labels each ADB step distinctly', async () => {
+  const f = await fixture({ version: 1, capacitor: {} }, { 'dry-run': true, action: 'capture', platform: 'android', name: 'one' })
+  await screenshots(f.ctx)
+  assert.deepEqual(f.ctx.plan.map(step => step.label), ['Capture Android screenshot', 'Pull Android screenshot', 'Remove remote Android screenshot'])
+})
 test('screenshot resizing creates size-specific outputs without overwriting originals', async () => {
   const f = await fixture({ version: 1, capacitor: { screenshots: { sizes: [{ width: 20, height: 30 }] } } }, { action: 'resize', input: 'captures', output: 'resized' })
   await f.file('captures/one.png', await sharp({ create: { width: 10, height: 10, channels: 4, background: '#f00' } }).png().toBuffer())

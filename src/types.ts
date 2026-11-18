@@ -18,7 +18,8 @@ export interface Config {
   electron?: { root?: string; url?: string; start?: Command; assets?: Images & { ico?: string; icns?: string; windowsCornerRadius?: number }; output?: string; builderConfig?: string; notaryProfile?: string; prepare?: Command[] };
   swift?: { root?: string; executable?: string; plist?: string; resources?: string; entitlements?: string; output?: string; identity?: string; icon?: string; iconOutput?: string };
   vscode?: { root?: string; prepare?: Command[]; noDependencies?: boolean; output?: string };
-  cloudflare?: { targets: Record<string, { kind: 'worker' | 'pages'; root?: string; config?: string; directory?: string; projectName?: string; secretsFile?: string; secretNames?: string[]; prepare?: Command[] }> };
+  cloudflare?: { credentialsFile?: string; targets: Record<string, CloudflareTarget> };
+  hostinger?: { credentialsFile?: string; targets: Record<string, HostingerTarget> };
   browser?: { root?: string; directory: string; output: string; prepare?: Command[] };
   dev?: { root?: string; processes: DevProcess[] };
   wait?: { targets: Record<string, WaitTarget> };
@@ -40,3 +41,8 @@ export interface EnvModule {
   /** Optional first comment lines of the editable file. */
   header?(environment: string): string[];
 }
+
+export interface CloudflareSettings { kind: 'worker' | 'pages'; root?: string; config?: string; directory?: string; projectName?: string; accountId?: string; domains?: string[]; secretsFile?: string; secretNames?: string[]; prepare?: Command[] }
+export interface CloudflareTarget extends CloudflareSettings { environments?: Record<string, Partial<CloudflareSettings>> }
+export interface HostingerSettings { domain?: string; username?: string; directory?: string; envFile?: string; excludeEnv?: string[]; databaseVariable?: string; nodeVersion?: 22 | 24; entryFile?: string; buildScript?: string; cron?: { command: string; schedule: string } }
+export interface HostingerTarget extends HostingerSettings { environments?: Record<string, Partial<HostingerSettings>> }

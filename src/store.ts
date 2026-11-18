@@ -41,7 +41,7 @@ function rubyBinary(): string {
 }
 export async function store(ctx: Context, action: string, forwarded: string[]) {
   const settings = storeSettings(ctx), { config, root, metadata, paths } = settings
-  const platform = ctx.choice('platform', ['android', 'ios', 'all'], action === 'check' || action === 'scaffold' || action === 'changelog' ? 'all' : 'android')
+  const platform = ctx.choice('platform', ['android', 'ios', 'all'], action === 'check' || action === 'scaffold' || action === 'changelog' || action === 'verify' ? 'all' : 'android')
   if (action === 'check') { if (!ctx.dryRun) await checkStore(ctx, platform); return }
   if (action === 'scaffold' || action === 'changelog') {
     if (!ctx.dryRun) {
@@ -75,20 +75,32 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     if (!ctx.dryRun) await writeChanged(outputPath(root, ctx.string('output', `exports/${platform}.csv`)), csv)
     return
   }
-  let args: string[]
+  let args: string[], lanes: string[][] | undefined
   let scope = 'all', uploading = false
   if (action === 'run') {
     requireValue(forwarded.length > 0, 'Use store run -- lanes or store run -- <android|ios> <lane>')
     if (forwarded[0] === 'lanes') requireValue(forwarded.length === 1, 'lanes takes no arguments')
     else {
-      const lanes = forwarded[0] === 'android' ? ['listing', 'images', 'listing_with_images', 'internal', 'pull', 'doctor'] : ['listing', 'screenshots', 'previews', 'listing_with_images', 'internal', 'pull', 'doctor']
+      const lanes = forwarded[0] === 'android' ? ['listing', 'images', 'listing_with_images', 'internal', 'pull', 'doctor', 'verify'] : ['listing', 'screenshots', 'previews', 'listing_with_images', 'internal', 'pull', 'doctor', 'verify']
       requireValue(['android', 'ios'].includes(forwarded[0]!) && lanes.includes(forwarded[1]!), 'Unsupported shared Fastlane lane')
-      for (const option of forwarded.slice(2)) requireValue(/^(track|version|version_code|status|groups|notes|age_rating|changelogs|validate|confirm):[^\r\n]+$/u.test(option), 'Unsupported Fastlane option; checks and Git safety cannot be bypassed')
+      for (const option of forwarded.slice(2)) requireValue(/^(track|version|version_code|status|groups|notes|age_rating|changelogs|validate|confirm|scope):[^\r\n]+$/u.test(option), 'Unsupported Fastlane option; checks and Git safety cannot be bypassed')
+      // Play releases are either a draft or rolled out completely to the internal track; partial rollouts and halts are not offered.
+      for (const option of forwarded.slice(2)) requireValue(!option.startsWith('status:') || ['status:draft', 'status:completed'].includes(option), 'status must be draft or completed')
+      requireValue(forwarded[1] === 'verify' || !forwarded.slice(2).some(x => x.startsWith('scope:')), 'Only the verify lane takes scope')
       requireValue(!(forwarded[0] === 'ios' && forwarded[1] === 'internal' && forwarded.slice(2).some(x => x.startsWith('validate:'))), 'TestFlight has no validation-only upload; use --dry-run')
-      uploading = !['pull', 'doctor'].includes(forwarded[1]!)
+      uploading = !['pull', 'doctor', 'verify'].includes(forwarded[1]!)
       scope = forwarded[1] === 'listing' ? 'text' : ['images', 'screenshots', 'previews'].includes(forwarded[1]!) ? 'media' : 'all'
     }
     args = forwarded
+  } else if (action === 'verify') {
+    // Read-only comparison with the store drafts. The default (--platform all) covers every configured store.
+    const only = ctx.choice('scope', ['text', 'media', 'all'], 'all')
+    const configured = { android: Boolean(config.androidId && config.playKey), ios: Boolean(config.iosId && config.appleKey) }
+    const platforms = platform === 'all' ? (['android', 'ios'] as const).filter(name => configured[name]) : [platform]
+    requireValue(platforms.length > 0, 'Configure store.androidId and store.playKey, or store.iosId and store.appleKey')
+    if (platform === 'all') for (const name of ['android', 'ios'] as const) if (!configured[name]) ctx.log(`[rds] Skipping ${name}: not configured`)
+    lanes = platforms.map(name => [name, 'verify', `scope:${only}`])
+    args = lanes[0]!
   } else {
     requireValue(platform !== 'all', 'Select one store platform')
     if (action === 'upload-listing') {
@@ -99,7 +111,7 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     } else if (action === 'upload-build') {
       requireValue(ctx.string('track', 'internal') === 'internal', 'Only internal testing uploads are implemented')
       requireValue(platform !== 'ios' || process.platform === 'darwin' || ctx.dryRun, 'Building a TestFlight IPA requires macOS/Xcode')
-      args = [platform, 'internal', `status:${ctx.choice('status', ['draft', 'completed'], 'draft')}`]
+      args = [platform, 'internal', `status:${ctx.choice('status', ['draft', 'completed'], 'completed')}`]
       if (ctx.flags.groups) args.push(`groups:${ctx.string('groups')}`)
       uploading = true
     } else args = [platform, action]
@@ -118,7 +130,7 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     BUNDLE_GEMFILE: join(support, 'Gemfile'), BUNDLE_PATH: outputPath(ctx.root, '.rds/gems'), BUNDLE_FROZEN: 'true',
     FASTLANE_SKIP_UPDATE_CHECK: '1', FASTLANE_OPT_OUT_USAGE: '1', FASTLANE_OPT_OUT_CRASH_REPORTING: '1',
     LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8',
-    RDS_STORE_ROOT: root, RDS_PROJECT_ROOT: ctx.root, RDS_CLI_ENTRY: cli, RDS_NODE: process.execPath,
+    RDS_STORE_ROOT: root, RDS_STORE_SUPPORT: support, RDS_PROJECT_ROOT: ctx.root, RDS_CLI_ENTRY: cli, RDS_NODE: process.execPath,
     RDS_CHECK_ARGS: JSON.stringify(['--cwd', ctx.root, ...(ctx.flags.config ? ['--config', ctx.path(ctx.string('config'))] : [])]),
     RDS_IOS_ID: config.iosId, RDS_IOS_SCHEME: config.iosScheme ?? 'App',
     RDS_DEFAULT_IOS_LOCALE: config.defaultLocales?.ios ?? config.defaultLocale ?? settings.locales[0]!.apple,
@@ -131,5 +143,11 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
   if (!ctx.dryRun) requireValue(/^(?:3\.(?:[3-9]|\d{2,})\.|[4-9]\.)/u.test(version.stdout), 'Fastlane requires Ruby 3.3 or newer; configure STORE_RUBY')
   try { await ctx.run(ruby, ['-S', 'bundle', 'check'], { cwd: cache, env, capture: true, label: 'Check pinned Fastlane gems' }) }
   catch { await ctx.run(ruby, ['-S', 'bundle', 'install'], { cwd: cache, env, label: 'Install pinned Fastlane gems' }) }
-  await ctx.run(ruby, ['-S', 'bundle', 'exec', 'fastlane', ...args], { cwd: cache, env, label: 'Run shared Fastlane lane' })
+  // Several lanes (verify on every store) all run so that one store's difference does not hide the other's.
+  const failed: string[] = []
+  for (const lane of lanes ?? [args]) {
+    try { await ctx.run(ruby, ['-S', 'bundle', 'exec', 'fastlane', ...lane], { cwd: cache, env, label: 'Run shared Fastlane lane' }) }
+    catch (error) { if (!lanes || lanes.length === 1) throw error; failed.push(lane[0]!) }
+  }
+  requireValue(!failed.length, `Store verification failed for: ${failed.join(', ')}`)
 }

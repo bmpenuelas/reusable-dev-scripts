@@ -62,6 +62,8 @@ Run `npm exec -- rds vue build`. Keep normal development servers and simple lint
 
 ## Workspace paths
 
+For APK installation, set `android.appId` to the APK's actual application ID, including a debug suffix when configured in Gradle. For example, an app whose release/Capacitor/store ID is `com.example.app` and whose debug variant adds `.debug` uses `android: { appId: 'com.example.app.debug' }` for its debug install workflow. This setting controls package verification and the target of an explicitly approved `--replace`; it does not rename the native project or store listing.
+
 ```js
 export default {
   version: 1,
