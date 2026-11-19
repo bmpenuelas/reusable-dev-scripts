@@ -14,7 +14,7 @@ export interface Config {
   vue?: { root?: string; typecheck?: 'build' | 'noEmit' | false; modes?: Record<string, string> };
   capacitor?: Hooks & { root?: string; packageJson?: string; platforms?: ('android' | 'ios')[]; androidProject?: string; iosProject?: string; assets?: Images & { native?: boolean }; locales?: NativeLocales; live?: { host?: string; port?: number; https?: boolean; ca?: string; timeout?: number }; screenshots?: { output?: string; sizes?: { width: number; height: number }[] } };
   android?: { root?: string; appId?: string; module?: string; apk?: string; aab?: string; mapping?: string; javaHome?: string; sdkRoot?: string };
-  store?: { root?: string; locales?: (string | { app: string; android: string; ios: string })[]; appLocales?: string[]; defaultLocale?: string; defaultLocales?: { android: string; ios: string }; iosDevices?: { iphone: boolean; ipad: boolean; watch: boolean }; androidId?: string; iosId?: string; appleKey?: string; playKey?: string; allowExternalCredentials?: boolean; iosProject?: string; iosScheme?: string; hooks?: { beforeUpload?: Command[] }; versionPackage?: string };
+  store?: { root?: string; locales?: (string | { app: string; android: string; ios: string })[]; appLocales?: string[]; defaultLocale?: string; defaultLocales?: { android: string; ios: string }; iosDevices?: { iphone: boolean; ipad: boolean; watch: boolean }; androidId?: string; iosId?: string; appleKey?: string; playKey?: string; allowExternalCredentials?: boolean; iosProject?: string; iosScheme?: string; hooks?: { beforeUpload?: Command[]; afterBuildUpload?: Command[] }; versionPackage?: string };
   electron?: { root?: string; url?: string; start?: Command; assets?: Images & { ico?: string; icns?: string; windowsCornerRadius?: number }; output?: string; builderConfig?: string; notaryProfile?: string; prepare?: Command[] };
   swift?: { root?: string; executable?: string; plist?: string; resources?: string; entitlements?: string; output?: string; identity?: string; icon?: string; iconOutput?: string };
   vscode?: { root?: string; prepare?: Command[]; noDependencies?: boolean; output?: string };
@@ -42,7 +42,7 @@ export interface EnvModule {
   header?(environment: string): string[];
 }
 
-export interface CloudflareSettings { kind: 'worker' | 'pages'; root?: string; config?: string; directory?: string; projectName?: string; accountId?: string; domains?: string[]; secretsFile?: string; secretNames?: string[]; prepare?: Command[] }
+export interface CloudflareSettings { kind: 'worker' | 'pages'; root?: string; config?: string; directory?: string; projectName?: string; accountId?: string; domains?: string[]; secretsFile?: string; secretNames?: string[]; commitDirty?: boolean; prepare?: Command[] }
 export interface CloudflareTarget extends CloudflareSettings { environments?: Record<string, Partial<CloudflareSettings>> }
 export interface HostingerSettings { domain?: string; username?: string; directory?: string; envFile?: string; excludeEnv?: string[]; databaseVariable?: string; nodeVersion?: 22 | 24; entryFile?: string; buildScript?: string; cron?: { command: string; schedule: string } }
 export interface HostingerTarget extends HostingerSettings { environments?: Record<string, Partial<HostingerSettings>> }

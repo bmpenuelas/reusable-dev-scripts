@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir } from 'node:fs/promises'
 import { dirname, join, relative, delimiter, isAbsolute, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createStoreMetadata } from '../support/store/metadata.mjs'
-import { artifacts, androidRoot } from './android.js'
+import { artifacts, androidMapping } from './android.js'
 import { nativeVersion } from './versions.js'
 import { inside, outputPath, requireValue, writeChanged } from './runtime.js'
 import type { Context } from './context.js'
@@ -83,9 +83,10 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     else {
       const lanes = forwarded[0] === 'android' ? ['listing', 'images', 'listing_with_images', 'internal', 'pull', 'doctor', 'verify'] : ['listing', 'screenshots', 'previews', 'listing_with_images', 'internal', 'pull', 'doctor', 'verify']
       requireValue(['android', 'ios'].includes(forwarded[0]!) && lanes.includes(forwarded[1]!), 'Unsupported shared Fastlane lane')
-      for (const option of forwarded.slice(2)) requireValue(/^(track|version|version_code|status|groups|notes|age_rating|changelogs|validate|confirm|scope):[^\r\n]+$/u.test(option), 'Unsupported Fastlane option; checks and Git safety cannot be bypassed')
+      for (const option of forwarded.slice(2)) requireValue(/^(track|version|version_code|status|groups|notes|age_rating|changelogs|validate|confirm|scope|commit):[^\r\n]+$/u.test(option), 'Unsupported Fastlane option; checks and Git safety cannot be bypassed')
       // Play releases are either a draft or rolled out completely to the internal track; partial rollouts and halts are not offered.
       for (const option of forwarded.slice(2)) requireValue(!option.startsWith('status:') || ['status:draft', 'status:completed'].includes(option), 'status must be draft or completed')
+      requireValue(!forwarded.slice(2).some(x => x.startsWith('commit:')) || forwarded.slice(2).includes('commit:false') || forwarded.slice(2).includes('commit:true'), 'commit must be true or false')
       requireValue(forwarded[1] === 'verify' || !forwarded.slice(2).some(x => x.startsWith('scope:')), 'Only the verify lane takes scope')
       requireValue(!(forwarded[0] === 'ios' && forwarded[1] === 'internal' && forwarded.slice(2).some(x => x.startsWith('validate:'))), 'TestFlight has no validation-only upload; use --dry-run')
       uploading = !['pull', 'doctor', 'verify'].includes(forwarded[1]!)
@@ -135,7 +136,7 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     RDS_IOS_ID: config.iosId, RDS_IOS_SCHEME: config.iosScheme ?? 'App',
     RDS_DEFAULT_IOS_LOCALE: config.defaultLocales?.ios ?? config.defaultLocale ?? settings.locales[0]!.apple,
     RDS_IOS_PROJECT: ctx.path(config.iosProject ?? join(ctx.config.capacitor?.root ?? '.', 'ios/App/App.xcodeproj')),
-    RDS_ANDROID_AAB: artifacts(ctx, 'release', 'aab'), RDS_ANDROID_MAPPING: inside(androidRoot(ctx), ctx.config.android?.mapping ?? 'app/build/outputs/mapping/release/mapping.txt'),
+    RDS_ANDROID_AAB: artifacts(ctx, 'release', 'aab'), RDS_ANDROID_MAPPING: androidMapping(ctx),
     ...(playKey ? { SUPPLY_JSON_KEY: playKey } : {}), ...(appleKey ? { APP_STORE_CONNECT_API_KEY_PATH: appleKey } : {}),
     ...(config.androidId ? { SUPPLY_PACKAGE_NAME: config.androidId } : {}), ...(selected ? { PATH: selected + delimiter + (process.env.PATH ?? '') } : {})
   }
@@ -150,4 +151,6 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     catch (error) { if (!lanes || lanes.length === 1) throw error; failed.push(lane[0]!) }
   }
   requireValue(!failed.length, `Store verification failed for: ${failed.join(', ')}`)
+  // Runs only once the store accepted a build; `commit:false` and a validation-only run opt out. rds itself never touches Git.
+  if (args[1] === 'internal' && !args.includes('commit:false') && !args.includes('validate:true')) await ctx.hooks(config.hooks?.afterBuildUpload, ctx.root, chosen)
 }

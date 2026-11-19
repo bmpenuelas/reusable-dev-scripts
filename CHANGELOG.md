@@ -1,0 +1,29 @@
+# Changelog
+
+Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
+
+## 0.4.0
+
+- Added `store.hooks.afterBuildUpload`: project-owned argv hooks that run after the store accepted an internal build upload. Skipped for listings, failed uploads, `validate:true` and `commit:false`. `rds` itself still never commits or pushes.
+- `store run` accepts `commit:true|false` to decide whether `afterBuildUpload` runs.
+- `electron notarize` gained `--staple <path>` to staple the `.app` inside a notarized ZIP, `*` wildcards in the last path segment of `--artifact` and `--staple`, and `APPLE_NOTARY_PROFILE` as a profile source (precedence: `--profile`, environment, `electron.notaryProfile`). The staple target is validated before submission.
+- `android build` logs the R8 mapping and native debug symbols after a verified release build. `RDS_ANDROID_MAPPING` follows `android.module` instead of assuming `app`.
+- `cloudflare.targets.<name>.commitDirty` adds `--commit-dirty=true` to `deploy-pages`.
+- `rds hosting drop --help` and `hosting recreate --help` now list their own options.
+
+## 0.3.0
+
+- Added `store verify`: a read-only comparison of local listing files with the Google Play and App Store Connect drafts (text, graphics, screenshots and previews). It exits non-zero on any difference and can serve as a `production.verify` step.
+- **Changed default:** `store upload-build` for Android now defaults to `status:completed` (internal testers receive the build as soon as Play processes it). Pass `--status draft` to keep the former draft behavior, which is required while an app has never been published.
+- `android build --reveal` treats Windows Explorer's normal exit code 1 as success and only warns when revealing genuinely fails.
+- Android installation steps have distinct labels.
+
+## 0.2.0
+
+- Added local-development families: `dev start`, `wait tcp`, `env template|validate|generate|check`, and `prisma migrate|status`.
+- Added Cloudflare Pages setup, Hostinger setup/deploy and the destructive `hosting reset|drop|recreate` lifecycle for disposable environments.
+- Commands resolve `pnpm` and Windows `.cmd`/`.bat` tools without a shell.
+
+## 0.1.2
+
+- Added configurable result banners (`output.banners`, `RDS_BANNERS`, `--banner`/`--no-banner`).

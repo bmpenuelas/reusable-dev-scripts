@@ -10,7 +10,8 @@ For a reusable agent skill, install the npm dependency first and run `npm exec -
 2. [Adoption guide](adoption.md): inventory and migration sequence.
 3. [Configuration patterns](configuration.md) and the relevant section of the [command reference](commands.md).
 4. [Safety model](safety.md): authorization, data loss, secrets, and dry-run limits.
-5. [Config types](../src/types.ts), [runtime validation](../src/config.ts), and [command registry](../src/cli.ts) when precise supported fields/flags matter.
+5. [Hosting guide](hosting.md) when the project deploys to Cloudflare Pages or Hostinger, and the [changelog](../CHANGELOG.md) when upgrading an existing pin.
+6. [Config types](../src/types.ts), [runtime validation](../src/config.ts), and [command registry](../src/cli.ts) when precise supported fields/flags matter.
 
 Do not invent missing flags, turn plain strings into executable shell commands, or infer which package owns an app version from a directory name.
 
@@ -21,6 +22,7 @@ Do not invent missing flags, turn plain strings into executable shell commands, 
 - Read applicable project instructions and root/workspace manifests.
 - Read the helper implementations being replaced, not just their names.
 - Identify build prerequisites, post-processing, version/lockfile ownership, native resource registration, authorization gates, and retry semantics.
+- Inventory every family, not only builds: dev-server launchers, readiness waits, environment-file generators, migrations, notarization, store listing checks and uploads, deployment scripts.
 - Identify credential sources by **variable/file names only**. Do not print, copy, commit, or request secret contents in a normal report.
 
 ### Propose the smallest change

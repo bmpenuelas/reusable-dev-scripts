@@ -19,6 +19,7 @@ An alias named `lint` might only run a typechecker. A script named `bundle` migh
 | Electron desktop application | `electron` | Frontend build recipe, builder config, signing identities and policy |
 | Swift macOS application | `swift` | Product/source variants, IDs, plist, entitlements |
 | Cloudflare deployment | `cloudflare` | Infrastructure and application configuration, domains, account policy |
+| Hostinger deployment and disposable-environment reset | `hostinger`, `hosting` | Application seeds, retention decisions, which environments are disposable |
 | Browser extension | `browser` | Build/copy recipe, manifest, browser-store submission |
 | Local development loop | `dev`, `wait` | Which processes exist, their commands, and what "ready" means for the application |
 | Per-environment settings | `env` | Defaults, validation rules and generated file formats, kept in one project module |
@@ -97,6 +98,11 @@ Keep an acceptance record of commands and artifact checks, without credentials o
 | Build a release AAB | `rds android build --configuration release --format aab` |
 | Install an existing debug APK | `rds android install --device <serial>` |
 | Validate a completed listing | `rds store check --strict` |
+| Compare local listing files with the store drafts | `rds store verify` (read-only) |
+| Commit version files after a build upload | `store.hooks.afterBuildUpload` running your own script |
+| Notarize a macOS ZIP and staple the app inside | `rds electron notarize --artifact "release/*-mac.zip" --staple "release/mac/*.app"` |
+| Run the frontend and Electron together | `rds electron dev` |
+| Run a Pages deployment from a dirty tree | `cloudflare.targets.<name>.commitDirty: true` |
 | Export localized iOS text | `rds store export --platform ios` |
 | Package a VS Code extension | `rds vscode package` |
 | Publish the same VSIX to both registries | `rds vscode publish --registry all` |

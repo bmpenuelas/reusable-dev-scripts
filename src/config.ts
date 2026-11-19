@@ -45,10 +45,10 @@ export function validateConfig(value: unknown): Config {
   keys(config.capacitor?.environmentByPlatform, ['android', 'ios'], 'environmentByPlatform')
   keys(config.capacitor?.live, ['host', 'port', 'https', 'ca', 'timeout'], 'capacitor.live')
   keys(config.capacitor?.screenshots, ['output', 'sizes'], 'capacitor.screenshots')
-  keys(config.store?.hooks, ['beforeUpload'], 'store.hooks')
+  keys(config.store?.hooks, ['beforeUpload', 'afterBuildUpload'], 'store.hooks')
   keys(config.store?.iosDevices, ['iphone', 'ipad', 'watch'], 'store.iosDevices')
   if (config.production?.environments) requireValue(Array.isArray(config.production.environments) && config.production.environments.length > 0 && config.production.environments.every(x => typeof x === 'string' && x.length), 'production.environments must be a non-empty string array')
-  const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'prepare']
+  const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'commitDirty', 'prepare']
   const hostingerFields = ['domain', 'username', 'directory', 'envFile', 'excludeEnv', 'databaseVariable', 'nodeVersion', 'entryFile', 'buildScript', 'cron']
   for (const [provider, fields] of [[config.cloudflare, cloudflareFields], [config.hostinger, hostingerFields]] as const) {
     if (!provider) continue
@@ -65,6 +65,7 @@ export function validateConfig(value: unknown): Config {
         for (const [key, value] of Object.entries(settings)) {
           if (key === 'environments') continue
           if (key === 'prepare') { hookList(value); continue }
+          if (key === 'commitDirty') { requireValue(typeof value === 'boolean', 'commitDirty must be a boolean'); continue }
           if (['domains', 'excludeEnv', 'secretNames'].includes(key)) { requireValue(Array.isArray(value) && value.every(x => typeof x === 'string' && x.length), key + ' must be a string array'); continue }
           if (key === 'nodeVersion') { requireValue([22, 24].includes(value as number), 'Hostinger nodeVersion must be 22 or 24'); continue }
           if (key === 'cron') {
@@ -104,7 +105,7 @@ export function validateConfig(value: unknown): Config {
   if (config.prisma?.variable !== undefined) requireValue(typeof config.prisma.variable === 'string' && /^[A-Za-z_]\w*$/u.test(config.prisma.variable), 'prisma.variable must be an environment variable name')
   hookList(config.production?.verify)
   for (const section of [config.capacitor, config.electron, config.vscode, config.browser]) hookList(section?.prepare)
-  hookList(config.capacitor?.afterBuild); hookList(config.capacitor?.afterSync); hookList(config.capacitor?.verify); hookList(config.store?.hooks?.beforeUpload)
+  hookList(config.capacitor?.afterBuild); hookList(config.capacitor?.afterSync); hookList(config.capacitor?.verify); hookList(config.store?.hooks?.beforeUpload); hookList(config.store?.hooks?.afterBuildUpload)
   if (config.capacitor?.build) validateCommand(config.capacitor.build)
   for (const command of Object.values(config.capacitor?.buildByPlatform ?? {})) validateCommand(command)
   for (const commands of Object.values(config.capacitor?.prepareByEnv ?? {})) hookList(commands)

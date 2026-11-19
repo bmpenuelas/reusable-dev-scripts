@@ -49,7 +49,7 @@ export default defineConfig({
 
 The example above assumes an existing Vue/Capacitor app and native projects. Replace example identifiers and paths; `rds` does not create the application. For a web-only project, configure just `vue`.
 
-Start from the [configuration examples](examples/): [Capacitor](examples/capacitor.config.mjs), [workspaces](examples/workspace.config.mjs), [stores](examples/store.config.mjs), [VS Code](examples/vscode.config.mjs), [Electron](examples/electron.config.mjs), or [Swift](examples/swift.config.mjs).
+Start from the [configuration examples](examples/): [Capacitor](examples/capacitor.config.mjs), [workspaces](examples/workspace.config.mjs), [stores](examples/store.config.mjs), [VS Code](examples/vscode.config.mjs), [Electron](examples/electron.config.mjs), [Swift](examples/swift.config.mjs), [services](examples/services.config.mjs), or [hosting](examples/hosting.config.mjs).
 
 Config is discovered upward from the working directory, so workspace commands can use a root config. A JSON alternative, `reusable-dev-scripts.config.json`, is also supported. `--cwd` and `--config` make working-directory/config selection explicit.
 
@@ -167,6 +167,7 @@ Each command below starts with `rds`. Configure only the modules you use.
 | Native Swift | `swift icons`, `bundle` |
 | Cloudflare | `cloudflare setup-pages`, `deploy-worker`, `deploy-pages`, `push-secrets` |
 | Hostinger | `hostinger setup`, `deploy` |
+| Hosting reset | `hosting reset`, `drop`, `recreate` (destructive, unprotected environments only) |
 | Browser extensions | `browser package` |
 | Local development | `dev start`, `wait tcp`, `env template`, `validate`, `generate`, `check`, `prisma migrate`, `status` |
 

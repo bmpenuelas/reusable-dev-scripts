@@ -19,6 +19,11 @@ export function artifacts(ctx: Context, configuration: string, format: string) {
   const path = format === 'aab' ? ctx.config.android?.aab ?? `${module}/build/outputs/bundle/${configuration}/${module}-${configuration}.aab` : ctx.config.android?.apk ?? `${module}/build/outputs/apk/${configuration}/${module}-${configuration}.apk`
   return inside(root, path)
 }
+export function androidMapping(ctx: Context): string {
+  const module = ctx.config.android?.module ?? 'app'
+  requireValue(/^[\w-]+$/u.test(module), 'Invalid Android module name')
+  return inside(androidRoot(ctx), ctx.config.android?.mapping ?? `${module}/build/outputs/mapping/release/mapping.txt`)
+}
 export async function androidBuild(ctx: Context, tasks: string[] = [], debug = false) {
   await ctx.guard(androidRoot(ctx), 'android')
   const configuration = debug ? 'debug' : ctx.choice('configuration', ['debug', 'release'], 'release')
@@ -34,6 +39,8 @@ export async function androidBuild(ctx: Context, tasks: string[] = [], debug = f
   if (!tasks.length) {
     requireValue(ctx.dryRun || existsSync(artifact), 'Gradle completed without producing the configured artifact')
     ctx.log(`${ctx.dryRun ? '[plan]' : '[rds]'} Artifact: ${artifact}`)
+    // Release builds also leave the files a store console accepts for deobfuscation and crash symbolication; report the ones that exist.
+    if (configuration === 'release' && !ctx.dryRun) for (const [label, path] of [['R8 mapping', androidMapping(ctx)], ['Native debug symbols', inside(root, `${module}/build/outputs/native-debug-symbols/release/native-debug-symbols.zip`)]] as const) if (existsSync(path)) ctx.log(`[rds] ${label}: ${path}`)
     if (ctx.boolean('reveal')) {
       // File-manager launch/exit status is not a build verification result.
       // In particular, Explorer can return a nonzero status after handing off.

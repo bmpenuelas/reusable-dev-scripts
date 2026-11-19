@@ -1,6 +1,6 @@
 ---
 name: reusable-dev-scripts
-description: Adopt reusable-dev-scripts in an existing project by mapping duplicated build and release helpers to type-specific rds commands while retaining application-owned behavior.
+description: Adopt reusable-dev-scripts in an existing project by mapping duplicated build, release, store, desktop, local-development and hosting helpers to type-specific rds commands while retaining application-owned behavior.
 ---
 
 # Adopt reusable-dev-scripts
@@ -22,10 +22,18 @@ The result points to `dist/index.js`; its parent package directory contains the 
 - `docs/agents.md`: integration procedure and completion report.
 - `docs/adoption.md`: module boundaries and migration sequence.
 - `docs/configuration.md`, `docs/commands.md`, and the relevant `examples/*.config.mjs`: supported configuration and execution order.
+- `docs/hosting.md`: Cloudflare Pages, Hostinger and the destructive `hosting reset|drop|recreate` lifecycle.
 - `docs/safety.md`: before any workflow with side effects.
+- `docs/troubleshooting.md` and `CHANGELOG.md`: known symptoms and behavior that changed between releases; compare the installed version with the one the project pinned.
 - `src/types.ts`, `src/config.ts`, and `src/cli.ts`: when supported fields, validation, or flags need clarification.
 
 Use `npm exec -- rds <module> <command> --help` after installing the dependency. If no toolkit workflow matches, keep the local implementation rather than inventing flags or repository presets.
+
+## Look at every module family
+
+Run `npm exec -- rds --help` and read the command list instead of relying on memory: new releases add families. Today they cover Vue, Capacitor (sync, versions, assets, locales, screenshots, live reload), Android (build, install, ADB), mobile stores (metadata checks, listing/build uploads, read-only `store verify`), VS Code and browser extensions, Electron (dev, assets, build, notarize), Swift, Cloudflare and Hostinger deployment, destructive hosting reset, and local development (`dev start`, `wait tcp`, `env`, `prisma`). Scan the project's scripts for each family, including ones that look unrelated to releases such as dev-server launchers, readiness loops, environment-file generators and migration runners.
+
+Application policy that must run around a shared command belongs in its documented hooks (for example `capacitor.afterBuild`, `store.hooks.beforeUpload` and `afterBuildUpload`, `production.verify`), not in a reimplementation of the command. `rds` never commits, pushes, tags or submits for review; keep those steps in a project hook or script.
 
 ## Map behavior before changing aliases
 

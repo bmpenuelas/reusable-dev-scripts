@@ -14,5 +14,7 @@ export default defineConfig({
     playKey: '.secrets/play-service-account.json',
     appleKey: '.secrets/app-store-connect.json',
     iosProject: 'ios/App/App.xcodeproj', iosScheme: 'App',
+    // Application policy around uploads. Hooks are argv arrays and run in the project root.
+    // hooks: { beforeUpload: [['node', 'scripts/check-release-ready.mjs']], afterBuildUpload: [['node', 'scripts/commit-version-files.mjs', '{platform}']] },
   },
 })

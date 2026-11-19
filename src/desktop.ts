@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
-import { cp, mkdir, readFile } from 'node:fs/promises'
-import { join, basename, relative } from 'node:path'
+import { cp, mkdir, readFile, readdir } from 'node:fs/promises'
+import { join, basename, dirname, relative } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import sharp from 'sharp'
 import { inside, outputPath, requireValue, writeChanged } from './runtime.js'
@@ -35,14 +35,20 @@ export async function electron(ctx: Context, action: string) {
   }
   if (action === 'notarize') {
     requireValue(process.platform === 'darwin' || ctx.dryRun, 'Notarization requires macOS')
-    const profile = ctx.string('profile', config.notaryProfile ?? '')
-    requireValue(profile, 'Use --profile or configure electron.notaryProfile (notarytool keychain profile)')
+    // Precedence: --profile, then APPLE_NOTARY_PROFILE, then the project's configured profile. Passwords are never accepted.
+    const profile = ctx.string('profile', process.env.APPLE_NOTARY_PROFILE || config.notaryProfile || '')
+    requireValue(profile, 'Use --profile, set APPLE_NOTARY_PROFILE or configure electron.notaryProfile (notarytool keychain profile)')
     await ctx.run('xcrun', ['notarytool', 'history', '--keychain-profile', profile], { cwd: root, label: 'Notarization credential preflight' })
     if (ctx.boolean('preflight')) return
     const artifact = ctx.string('artifact'); requireValue(/\.(dmg|pkg|zip)$/iu.test(artifact), '--artifact must be a DMG, PKG, or ZIP')
-    const path = inside(root, artifact); requireValue(ctx.dryRun || existsSync(path), 'Notarization artifact is missing')
+    const path = await artifactPath(ctx, root, artifact, '--artifact')
+    // A ZIP cannot be stapled, so it needs --staple naming the contained .app; any other artifact is stapled itself unless --staple selects another file.
+    // Resolve and validate the staple target before submitting, so a typo cannot cost a completed notarization round trip.
+    const staple = ctx.flags.staple ? ctx.string('staple') : path.endsWith('.zip') ? '' : path
+    if (staple) requireValue(/\.(app|dmg|pkg)$/iu.test(staple), '--staple must be an .app, DMG, or PKG')
+    const target = staple ? staple === path ? path : await artifactPath(ctx, root, staple, '--staple') : ''
     await ctx.run('xcrun', ['notarytool', 'submit', path, '--wait', '--keychain-profile', profile], { cwd: root, label: 'Submit notarization artifact' })
-    if (!path.endsWith('.zip')) { await ctx.run('xcrun', ['stapler', 'staple', path], { cwd: root }); await ctx.run('xcrun', ['stapler', 'validate', path], { cwd: root }) }
+    if (target) { await ctx.run('xcrun', ['stapler', 'staple', target], { cwd: root, label: 'Staple notarization ticket' }); await ctx.run('xcrun', ['stapler', 'validate', target], { cwd: root, label: 'Validate stapled ticket' }) }
     return
   }
   const platform = ctx.choice('platform', ['mac', 'windows', 'linux'], process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'windows' : 'linux')
@@ -56,6 +62,19 @@ export async function electron(ctx: Context, action: string) {
   args.push(...(arch === 'all' ? ['--arm64', '--x64'] : [`--${arch}`]), '--publish', 'never', `--config.directories.output=${output}`)
   if (config.builderConfig) args.push('--config', inside(root, config.builderConfig))
   await ctx.run('electron-builder', args, { cwd: root, ...(ctx.boolean('unsigned') ? { env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' } } : {}), label: 'Build Electron distribution' })
+}
+/** A path inside the module root. Only the last segment may contain `*`, and it must then match exactly one entry (dry-run keeps the pattern). */
+async function artifactPath(ctx: Context, root: string, value: string, option: string): Promise<string> {
+  const normalized = value.replaceAll('\\', '/'), name = normalized.slice(normalized.lastIndexOf('/') + 1)
+  requireValue(!normalized.slice(0, normalized.length - name.length).includes('*'), `${option} may use * only in the last path segment`)
+  if (!name.includes('*')) { const path = inside(root, value); requireValue(ctx.dryRun || existsSync(path), `${option} item is missing`); return path }
+  const directory = inside(root, dirname(value))
+  if (ctx.dryRun && !existsSync(directory)) return join(directory, name)
+  const expression = new RegExp(`^${name.split('*').map(part => part.replace(/[.+?^${}()|[\]\\]/gu, '\\$&')).join('[^/\\\\]*')}$`, 'u')
+  const matches = (await readdir(directory).catch(() => [] as string[])).filter(entry => expression.test(entry))
+  if (ctx.dryRun && !matches.length) return join(directory, name)
+  requireValue(matches.length === 1, `${option} must match exactly one item; found ${matches.length}`)
+  return inside(root, join(dirname(value), matches[0]!))
 }
 export async function electronAssets(ctx: Context) {
   const config = ctx.section('electron').assets, root = ctx.moduleRoot('electron')

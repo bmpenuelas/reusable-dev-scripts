@@ -10,10 +10,15 @@
 | Native version synchronization | Writes version settings; `--bump` also changes package/lockfile versions |
 | Android install | Replaces an installed APK with `adb install -r`; `--replace` explicitly uninstalls first and deletes local app data |
 | Screenshots | Writes captures/resized files; opening a session can build and install the app |
+| Store hooks | `store.hooks.beforeUpload` and `afterBuildUpload` run your commands (for example a Git commit) with your permissions; `afterBuildUpload` runs only after the store accepted a build |
 | Store commands | `check` is local; `doctor` and `verify` read remote account state (`verify` aborts its Play edit and changes nothing); listing/build uploads and pull perform their documented remote/local effects |
 | VS Code publish | Publishes to the requested registries, defaulting to both |
 | Electron notarize | Submits an artifact to a remote service, then may staple it |
 | Cloudflare commands | Deploy code/files or change allowlisted Worker secrets |
+| Hostinger and Cloudflare Pages setup | `setup-pages`/`hostinger setup` create or change provider resources and need `--yes`; `deploy` uploads the built files |
+| `hosting reset`, `drop`, `recreate` | Permanently delete the configured website, database, cron jobs and (unless `--keep-pages`) the Pages project. Only unprotected environments and exact `--confirm-host`/`--confirm-project` values are accepted; `--dry-run` and `--check` change nothing |
+| `wait tcp` | Opens TCP connections to the configured endpoint; it changes nothing |
+| Swift bundle | Writes and signs an app bundle, ad-hoc unless an identity is configured |
 | `dev start` | Runs the configured processes until one exits; it cannot stop what a process spawns on its own |
 | `env generate` | Writes the files the project module returns, including secrets; keep them ignored by Git |
 | `prisma migrate` | Changes the schema of the database named by the generated environment file; protected environments need `--allow-production` and the typed or `--confirm-host` host |
