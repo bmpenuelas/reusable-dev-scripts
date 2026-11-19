@@ -125,7 +125,7 @@ platform :android do
   desc "Compare the local listing text and graphics with the Google Play draft (read-only, fails on any difference)"
   lane :verify do |options|
     require_key.call(play_key, "Google Play service account key")
-    UI.user_error!("The Google Play draft differs from the local files") unless RdsStoreVerify.android(key: play_key, scope: options[:scope] || "all", root: store_dir)
+    UI.user_error!("The Google Play draft differs from the local files") unless RdsStoreVerify.android(key: play_key, scope: options[:scope] || "all", root: store_dir, version_code: options[:version_code])
   end
 
   desc "Check the Play key works and show the releases on each track"

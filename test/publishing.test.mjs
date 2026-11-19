@@ -107,6 +107,20 @@ test('store verify defaults to every configured store, takes platform and scope,
   const ruby = await readFile(new URL('../support/store/verify.rb', import.meta.url), 'utf8')
   assert.ok(ruby.includes('abort_current_edit')); assert.ok(!/upload_to_play_store|deliver\(|\.update!|\.delete!|commit_edit|\.save\b/u.test(ruby))
 })
+test('store verify compares the release notes of the package version code and accepts an override', async () => {
+  const settings = { root: 'store', locales: ['en-US'], androidId: 'app.fixture', playKey: 'private/play.json', iosId: 'app.fixture', appleKey: 'private/apple.json' }
+  const lanes = f => f.ctx.plan.filter(x => x.args.includes('verify')).map(x => x.args.slice(x.args.indexOf('verify') - 1))
+  let f = await fixture({ version: 1, store: settings }, { 'dry-run': true })
+  await f.file('package.json', '{"name":"app","version":"1.0.101"}')
+  await store(f.ctx, 'verify', [])
+  assert.deepEqual(lanes(f), [['android', 'verify', 'scope:all', 'version_code:1000101'], ['ios', 'verify', 'scope:all']])
+  f = await fixture({ version: 1, store: settings }, { 'dry-run': true, platform: 'android', 'version-code': '1000050' })
+  await store(f.ctx, 'verify', []); assert.deepEqual(lanes(f), [['android', 'verify', 'scope:all', 'version_code:1000050']])
+  f = await fixture({ version: 1, store: settings }, { 'dry-run': true, platform: 'android', 'version-code': 'abc' })
+  await assert.rejects(store(f.ctx, 'verify', []), /version-code/)
+  const ruby = await readFile(new URL('../support/store/verify.rb', import.meta.url), 'utf8')
+  assert.ok(ruby.includes('def self.android_notes') && ruby.includes('release_notes') && ruby.includes('abort_current_edit'))
+})
 test('only the internal lanes reach testers; every listing lane stays a draft', async () => {
   const f = await fixture({ version: 1, store: { root: 'store', locales: ['en-US'], androidId: 'app.fixture', playKey: 'private/play.json', iosId: 'app.fixture', appleKey: 'private/apple.json' } }, { 'dry-run': true, platform: 'android' })
   const lane = () => f.ctx.plan.at(-1).args.slice(-3)

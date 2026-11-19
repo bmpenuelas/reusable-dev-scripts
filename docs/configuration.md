@@ -67,6 +67,25 @@ export default {
 
 Only `playKey`/`appleKey` accept this exception. Relative filenames still resolve inside the config root; `../` traversal is not enabled. Key contents are not loaded by config import or dry-run, copied into the project, or printed by rds. Fastlane reads them only during the requested real operation. Leave the opt-in off when project-contained keys are sufficient. Outputs and cleanup paths always remain contained. Set the relevant credential environment variables before an authenticated command; undefined fields are not credentials.
 
+## Store account access
+
+A working key is only half of the setup: the account behind it must be allowed to touch the app. The labels below are the Play Console and App Store Connect names at the time of writing, not an official Google or Apple reference, so check the console if one differs.
+
+**Google Play.** Enable the *Google Play Android Developer API* in the Google Cloud project that owns the service account, then invite the service account's email in Play Console → *Users and permissions* → *Invite new users*. Prefer **App permissions** for this one app over account-wide access, and do not make the account an admin. Tick:
+
+| Checkbox (App permissions) | Needed for |
+| --- | --- |
+| View app information and download bulk reports (read-only) | `store doctor`, `pull`, `verify` (`verify` opens a Play edit and always aborts it) |
+| Manage store presence | `upload-listing` (text and graphics) |
+| Release apps to testing tracks | `upload-build --platform android` (internal track) |
+| Manage testing tracks and edit tester lists | Some setups need it for track uploads; tick it if the build upload is refused |
+
+*Create, edit, and delete draft apps* (an account-level permission) is only needed while the app is still a draft in Play Console. rds never releases to production or other public tracks, so *Release to production, exclude devices, and use Play App Signing* is not needed; add it only if Play itself refuses an operation. The app must already exist with at least one uploaded build, and new permissions can take a while to apply.
+
+`The caller does not have permission` from `store doctor` means the service account has no access to this app yet, for example a key shared with another app of the same developer account that was never invited to this one.
+
+**App Store Connect.** Use a team API key (Users and Access → Integrations → App Store Connect API) with the **App Manager** role, which covers `upload-listing` and TestFlight uploads. A narrower role is not guaranteed to work. The key is saved as Fastlane JSON (`key_id`, `issuer_id`, `key`, `in_house`), and one team key serves every app of that team.
+
 ## Minimal Vue application
 
 ```js

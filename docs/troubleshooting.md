@@ -18,6 +18,7 @@ Start with `npm exec -- rds <module> <command> --help`. The [command registry](.
 | Swift/Electron cleanup rejects an existing output | Choose a fresh output location. The toolkit refuses to recursively remove directories it did not mark as owned; do not point output at an important folder. |
 | Live reload cannot reach the frontend | Check host/port, strict-port conflicts, device forwarding, Vite HTTPS configuration and CA trust. Public hosts require HTTPS. Do not disable certificate verification. |
 | Ruby/Bundler is unavailable | Install Ruby >=3.3 and Bundler separately. `STORE_RUBY` can select the Ruby executable. Credentials and gems are not installed globally by this tool. |
+| `store doctor` fails with `The caller does not have permission` (Google Play) | The service account is not invited to this app. In Play Console → Users and permissions, add it with the app permissions *View app information*, *Manage store presence* and *Release apps to testing tracks*. See [store account access](configuration.md#store-account-access). |
 | Tests skip a filesystem/platform feature | Read the explicit skip reason and rerun in a suitable environment when that feature must be validated. Report a skip as a skip, not a passing check. |
 
 Keep diagnostics safe: avoid copying credential files, full environment dumps, or unredacted invocation plans. A dry-run can validate the plan without proving that a native build, signature, remote account, or deployment will succeed.

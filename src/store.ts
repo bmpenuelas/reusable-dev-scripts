@@ -100,7 +100,13 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     const platforms = platform === 'all' ? (['android', 'ios'] as const).filter(name => configured[name]) : [platform]
     requireValue(platforms.length > 0, 'Configure store.androidId and store.playKey, or store.iosId and store.appleKey')
     if (platform === 'all') for (const name of ['android', 'ios'] as const) if (!configured[name]) ctx.log(`[rds] Skipping ${name}: not configured`)
-    lanes = platforms.map(name => [name, 'verify', `scope:${only}`])
+    // Android release notes are compared for one version code: --version-code, else the one derived from the package version.
+    let versionCode = ctx.string('version-code')
+    requireValue(!versionCode || /^[1-9]\d{0,9}$/u.test(versionCode), '--version-code must be a positive integer')
+    if (!versionCode && platforms.includes('android')) {
+      try { versionCode = String(nativeVersion(JSON.parse(await readFile(ctx.path(config.versionPackage ?? 'package.json'), 'utf8')).version).build) } catch { versionCode = '' }
+    }
+    lanes = platforms.map(name => [name, 'verify', `scope:${only}`, ...(name === 'android' && versionCode ? [`version_code:${versionCode}`] : [])])
     args = lanes[0]!
   } else {
     requireValue(platform !== 'all', 'Select one store platform')

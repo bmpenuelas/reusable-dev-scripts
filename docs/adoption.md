@@ -98,7 +98,7 @@ Keep an acceptance record of commands and artifact checks, without credentials o
 | Build a release AAB | `rds android build --configuration release --format aab` |
 | Install an existing debug APK | `rds android install --device <serial>` |
 | Validate a completed listing | `rds store check --strict` |
-| Compare local listing files with the store drafts | `rds store verify` (read-only) |
+| Compare local listing files and Play release notes with the stores | `rds store verify` (read-only) |
 | Commit version files after a build upload | `store.hooks.afterBuildUpload` running your own script |
 | Notarize a macOS ZIP and staple the app inside | `rds electron notarize --artifact "release/*-mac.zip" --staple "release/mac/*.app"` |
 | Run the frontend and Electron together | `rds electron dev` |

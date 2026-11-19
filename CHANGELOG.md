@@ -2,6 +2,10 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
+## 0.6.0
+
+- `store verify` (scope `text` or `all`) now also compares Google Play release notes: each language with a local `changelogs/<versionCode>.txt` against every track release that contains that version code. The version code defaults to the one derived from the package version; `--version-code N` overrides it. A build that is on no track yet is reported, not failed. Projects that keep changelog files can now see new differences from `store verify`.
+
 ## 0.5.0
 
 - Added top-level `defaultEnvironment` so single-environment projects can run `cloudflare`, `hostinger`, `hosting`, `env` and `prisma` commands without `--env`. `--env` wins when given; other commands never use it, and a default named `production` keeps the production guard.

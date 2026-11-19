@@ -31,7 +31,7 @@ Use `npm exec -- rds <module> <command> --help` after installing the dependency.
 
 ## Look at every module family
 
-Run `npm exec -- rds --help` and read the command list instead of relying on memory: new releases add families. Today they cover Vue, Capacitor (sync, versions, assets, locales, screenshots, live reload), Android (build, install, ADB), mobile stores (metadata checks, listing/build uploads, read-only `store verify`), VS Code and browser extensions, Electron (dev, assets, build, notarize), Swift, Cloudflare and Hostinger deployment, destructive hosting reset, and local development (`dev start`, `wait tcp`, `env`, `prisma`). Scan the project's scripts for each family, including ones that look unrelated to releases such as dev-server launchers, readiness loops, environment-file generators and migration runners.
+Run `npm exec -- rds --help` and read the command list instead of relying on memory: new releases add families. Today they cover Vue, Capacitor (sync, versions, assets, locales, screenshots, live reload), Android (build, install, ADB), mobile stores (metadata checks, listing/build uploads, read-only `store verify` of listing text, graphics and release notes), VS Code and browser extensions, Electron (dev, assets, build, notarize), Swift, Cloudflare and Hostinger deployment, destructive hosting reset, and local development (`dev start`, `wait tcp`, `env`, `prisma`). Scan the project's scripts for each family, including ones that look unrelated to releases such as dev-server launchers, readiness loops, environment-file generators and migration runners.
 
 A project with only one environment sets `defaultEnvironment` once instead of passing `--env` to every cloudflare, hostinger, hosting, env and prisma command; do not invent a fake environment per alias. A project that configures no environments at all needs neither: cloudflare and hostinger use the neutral `default` environment (prisma, env and hosting reset still require an explicit one).
 
@@ -50,6 +50,8 @@ Keep product-specific source generation, domain policy, approvals, signing choic
 ## Verify and report honestly
 
 Start with help, configuration validation and dry-run, then existing local checks. Keep old helpers until equivalent behavior is demonstrated. Do not turn a plan into a claim that a native artifact or remote workflow succeeded.
+
+For store commands a working key is not enough: the Play service account must be invited to the specific app, and the App Store Connect key needs the App Manager role. When `store doctor` reports `The caller does not have permission`, point the user to the [store account access](../../docs/configuration.md#store-account-access) checklist (Play Console app permissions *View app information*, *Manage store presence*, *Release apps to testing tracks*) rather than changing code or credentials.
 
 Do not run deployments, store uploads, signing, device replacement/data clearing, or production actions just to verify a migration. Obtain the user's approval for those effects separately. `--allow-production` is acknowledgement, not a substitute for the application's authorization boundary.
 

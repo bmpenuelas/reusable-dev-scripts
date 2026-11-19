@@ -49,7 +49,7 @@ export const commands: Record<string, string[]> = {
   'store changelog': ['version-code', 'text', 'force'], 'store export': ['platform', 'output', 'format'],
   'store upload-listing': ['platform', 'only', 'include-changelogs', 'all-locales'],
   'store upload-build': ['platform', 'track', 'status', 'groups', 'all-locales'],
-  'store pull': ['platform'], 'store doctor': ['platform'], 'store verify': ['platform', 'scope'],'store run': [],
+  'store pull': ['platform'], 'store doctor': ['platform'], 'store verify': ['platform', 'scope', 'version-code'],'store run': [],
   'vscode package': ['output', 'no-dependencies'], 'vscode publish': ['output', 'registry', 'bump', 'no-dependencies'],
   'electron dev': [], 'electron assets': ['check'], 'electron clean': [], 'electron build': ['platform', 'arch', 'format', 'clean', 'unsigned'],
   'electron notarize': ['artifact', 'staple', 'profile', 'preflight'],

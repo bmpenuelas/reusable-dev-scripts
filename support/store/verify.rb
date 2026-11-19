@@ -25,6 +25,7 @@ module RdsStoreVerify
       @matched = Hash.new(0)
       @problems = []
       @pending = []
+      @info = []
     end
 
     def compare(group, label, same, detail = 'differs from the store')
@@ -36,6 +37,11 @@ module RdsStoreVerify
       @problems << "#{label}: #{detail}"
     end
 
+    # Non-failing line (for example a release that is not in the store yet).
+    def info(line)
+      @info << line
+    end
+
     def processing(label, state)
       @pending << "#{label}: #{state}"
     end
@@ -43,8 +49,9 @@ module RdsStoreVerify
     def finish(store_name)
       puts "\n#{store_name}"
       @checked.each { |group, count| puts "  #{group}: #{@matched[group]}/#{count} match" }
-      puts "  nothing compared (no local files for this scope)" if @checked.empty? && @problems.empty?
+      puts "  nothing compared (no local files for this scope)" if @checked.empty? && @problems.empty? && @info.empty?
       @pending.each { |line| puts "  still processing: #{line}" }
+      @info.each { |line| puts "  #{line}" }
       unless @problems.empty?
         puts "  #{@problems.length} difference(s):"
         @problems.each { |line| puts "    - #{line}" }
@@ -71,13 +78,40 @@ module RdsStoreVerify
     Dir.children(dir).select { |n| File.file?(File.join(dir, n)) && extensions.include?(File.extname(n).downcase) }.sort.map { |n| File.join(dir, n) }
   end
 
-  # Google Play: listing text per language and every graphic (by SHA-256, in upload order).
-  def self.android(key:, scope:, root:)
+  # Release notes (changelogs/<versionCode>.txt) against every track release that contains that version code.
+  # Only languages with a non-empty local file are compared. A version code that is on no track yet is reported, not failed.
+  def self.android_notes(client, metadata, version_code, report)
+    local = {}
+    locale_dirs(metadata).each do |locale|
+      path = File.join(metadata, locale, 'changelogs', "#{version_code}.txt")
+      local[locale] = text(path) if File.exist?(path) && !text(path).empty?
+    end
+    return if local.empty?
+    releases = client.tracks.flat_map do |track|
+      (track.releases || []).select { |release| (release.version_codes || []).map(&:to_s).include?(version_code.to_s) }.map { |release| [track.track, release] }
+    end
+    if releases.empty?
+      report.info("release notes: versionCode #{version_code} is not on any Play track yet, nothing to compare")
+      return
+    end
+    releases.each do |track, release|
+      remote = (release.release_notes || []).to_h { |note| [note.language, note.text] }
+      local.each do |locale, content|
+        label = "android/#{locale}/changelogs/#{version_code} (#{track})"
+        if remote[locale].nil? then report.compare('release notes', label, false, 'language missing in the release')
+        else report.compare('release notes', label, content == remote_text(remote[locale])) end
+      end
+    end
+  end
+
+  # Google Play: listing text per language, release notes of one version code and every graphic (by SHA-256, in upload order).
+  def self.android(key:, scope:, root:, version_code: nil)
     metadata = File.join(root, 'fastlane/metadata/android')
     report = Report.new
     client = Supply::Client.make_from_config(params: { json_key: File.expand_path(key), timeout: 120 })
     client.begin_edit(package_name: ENV.fetch('SUPPLY_PACKAGE_NAME'))
     begin
+      android_notes(client, metadata, version_code, report) if %w[text all].include?(scope) && version_code && !version_code.to_s.empty?
       listings = client.listings.to_h { |l| [l.language, l] }
       locale_dirs(metadata).each do |locale|
         if %w[text all].include?(scope)
