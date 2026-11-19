@@ -5,12 +5,12 @@ import type { Context } from './context.js'
 
 /** Hostinger Web/Cloud hosting. Website/plan selection is explicit; never buys a plan or deletes data. */
 export async function hostinger(ctx: Context, action: string, fetcher: typeof fetch = fetch) {
+  ctx.requireEnvironment('Hostinger commands')
   const config = ctx.section('hostinger'), names = Object.keys(config.targets)
   const name = ctx.string('target', names.length === 1 ? names[0]! : '')
   const base = Object.hasOwn(config.targets, name) ? config.targets[name] : undefined
   requireValue(base, 'Select a configured Hostinger target with --target')
   const target = { ...base, ...base.environments?.[ctx.environment] }
-  requireValue(ctx.flags.env, 'Hostinger mutations require an explicit --env')
   requireValue(target.domain && /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9-]+$/u.test(target.domain), 'Configure a valid Hostinger target domain')
   requireValue(target.username && /^[a-zA-Z0-9_]+$/u.test(target.username), 'Configure the Hostinger account username')
   requireValue(ctx.dryRun || ctx.boolean('yes'), 'Hostinger operations require --yes (deployment replaces website contents)')

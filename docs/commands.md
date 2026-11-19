@@ -148,10 +148,10 @@ Set `STORE_RUBY` if Ruby >=3.3 isn't on PATH. macOS Homebrew installations are d
 
 `cloudflare.targets` maps names to `{ kind: 'worker'|'pages', root?, config?, directory?, projectName?, prepare?, secretsFile?, secretNames?, commitDirty? }`.
 
-Select `--target` when more than one exists. **Explicit `--env` is required**. Worker `config` and Pages `directory` are target-root-relative. Preparation hooks run in config root. Secrets files are **config-root-relative**.
+Select `--target` when more than one exists. **An environment is required**: pass `--env`, or set the top-level `defaultEnvironment` for a project with only one (see [single-environment projects](configuration.md#single-environment-projects)). Worker `config` and Pages `directory` are target-root-relative. Preparation hooks run in config root. Secrets files are **config-root-relative**.
 
-- `deploy-worker`: explicit Wrangler config + environment.
-- `deploy-pages`: built directory + project name + branch; branch defaults to `main` for production or the environment name otherwise. `commitDirty: true` adds `--commit-dirty=true` so Wrangler deploys from a working tree with uncommitted changes without its warning; the default leaves Wrangler's behavior unchanged.
+- `deploy-worker`: explicit Wrangler config + environment. The environment is passed to Wrangler as `--env`; set the target's `wranglerEnv` to another name, or to `false` when the Worker only has top-level configuration.
+- `deploy-pages`: built directory + project name + branch; branch is the target's `branch`, else `main` for production, else the environment name. `commitDirty: true` adds `--commit-dirty=true` so Wrangler deploys from a working tree with uncommitted changes without its warning; the default leaves Wrangler's behavior unchanged.
 - `push-secrets`: reads dotenv/JSON, checks an explicit name allowlist, sends JSON on stdin to `wrangler secret bulk`. Other variables cannot be uploaded.
 
 No infrastructure provisioning, database wiping, app configuration generation or account inference is performed. Preserve existing security/header/domain policy in the consuming project.
@@ -182,7 +182,7 @@ Only the host and port are printed, never the URL or its credentials. `hint` is 
 
 ### Environment files
 
-`rds env template|validate|generate|check --env <name>`
+`rds env template|validate|generate|check --env <name>` (`--env` may be omitted when `defaultEnvironment` is configured)
 
 `env: { module, directory?, environments?, autoCreate?, hints? }`. Each environment has an editable, uncommitted file at `<directory>/<name>.json5` (default `.gitignored/environments`; comments and trailing commas are allowed) and one or more generated files. `--env` is mandatory and must be one of `environments` (default `development`, `staging`, `production`).
 
@@ -208,7 +208,7 @@ export const outputs = (env, config) => [{ path: `.env.${env}`, content: `API_UR
 
 ### Prisma migrations
 
-`rds prisma migrate|status --env <name> [--confirm-host <host>]`
+`rds prisma migrate|status --env <name> [--confirm-host <host>]` (`--env` may be omitted when `defaultEnvironment` is configured)
 
 `prisma: { root?, envFile, variable? }`. The database URL is read from `variable` (default `DATABASE_URL`) in `envFile`, a dotenv path relative to the config root where `{env}` becomes the environment. Generate that file first, for example with `rds env generate`. `migrate` runs `prisma migrate deploy` and `status` runs `prisma migrate status` from `root`, using the project's own `prisma` package. The URL is handed to Prisma through its environment, never logged; the host is shown.
 

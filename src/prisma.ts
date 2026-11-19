@@ -8,7 +8,7 @@ import type { Context } from './context.js'
 export async function prisma(ctx: Context, action: string) {
   const config = ctx.section('prisma'), root = ctx.moduleRoot('prisma')
   requireValue(typeof config.envFile === 'string' && config.envFile.length > 0, 'Configure prisma.envFile first')
-  requireValue(ctx.flags.env, 'prisma commands need an explicit --env')
+  ctx.requireEnvironment('prisma commands')
   const variable = config.variable ?? 'DATABASE_URL', envFile = ctx.path(config.envFile.replaceAll('{env}', ctx.environment))
   requireValue(existsSync(envFile), `Missing ${config.envFile.replaceAll('{env}', ctx.environment)}; generate the environment files first`)
   const url = parseEnv(readFileSync(envFile, 'utf8'))[variable]

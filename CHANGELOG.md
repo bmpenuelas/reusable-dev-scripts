@@ -2,6 +2,11 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
+## 0.5.0
+
+- Added top-level `defaultEnvironment` so single-environment projects can run `cloudflare`, `hostinger`, `hosting`, `env` and `prisma` commands without `--env`. `--env` wins when given; other commands never use it, and a default named `production` keeps the production guard.
+- Added Cloudflare target settings `branch` (Pages) and `wranglerEnv` (Workers: a name, or `false` to omit `--env`).
+
 ## 0.4.0
 
 - Added `store.hooks.afterBuildUpload`: project-owned argv hooks that run after the store accepted an internal build upload. Skipped for listings, failed uploads, `validate:true` and `commit:false`. `rds` itself still never commits or pushes.

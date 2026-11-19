@@ -10,10 +10,10 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'hostinger']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'hostinger', 'defaultEnvironment']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
-    if (key !== 'version') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
+    if (key !== 'version' && key !== 'defaultEnvironment') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
   }
   const fields: Record<string, string[]> = {
     output: ['banners'],
@@ -26,6 +26,7 @@ export function validateConfig(value: unknown): Config {
     vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets', 'credentialsFile'], hostinger: ['targets', 'credentialsFile'], browser: ['root', 'directory', 'output', 'prepare'],
     dev: ['root', 'processes'], wait: ['targets'], env: ['directory', 'module', 'environments', 'autoCreate', 'hints'], prisma: ['root', 'envFile', 'variable']
   }
+  if (data.defaultEnvironment !== undefined) requireValue(typeof data.defaultEnvironment === 'string' && /^[a-zA-Z][\w-]*$/u.test(data.defaultEnvironment), 'defaultEnvironment must be an environment name')
   const keys = (entry: unknown, allowed: string[], label: string) => {
     if (entry === undefined) return
     requireValue(entry !== null && typeof entry === 'object' && !Array.isArray(entry), `${label} must be an object`)
@@ -48,7 +49,7 @@ export function validateConfig(value: unknown): Config {
   keys(config.store?.hooks, ['beforeUpload', 'afterBuildUpload'], 'store.hooks')
   keys(config.store?.iosDevices, ['iphone', 'ipad', 'watch'], 'store.iosDevices')
   if (config.production?.environments) requireValue(Array.isArray(config.production.environments) && config.production.environments.length > 0 && config.production.environments.every(x => typeof x === 'string' && x.length), 'production.environments must be a non-empty string array')
-  const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'commitDirty', 'prepare']
+  const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'commitDirty', 'branch', 'wranglerEnv', 'prepare']
   const hostingerFields = ['domain', 'username', 'directory', 'envFile', 'excludeEnv', 'databaseVariable', 'nodeVersion', 'entryFile', 'buildScript', 'cron']
   for (const [provider, fields] of [[config.cloudflare, cloudflareFields], [config.hostinger, hostingerFields]] as const) {
     if (!provider) continue
@@ -65,6 +66,8 @@ export function validateConfig(value: unknown): Config {
         for (const [key, value] of Object.entries(settings)) {
           if (key === 'environments') continue
           if (key === 'prepare') { hookList(value); continue }
+          if (key === 'branch') { requireValue(typeof value === 'string' && /^[\w][\w./-]*$/u.test(value), 'Pages branch must be a branch name'); continue }
+          if (key === 'wranglerEnv') { requireValue(value === false || (typeof value === 'string' && /^[a-zA-Z][\w-]*$/u.test(value)), 'wranglerEnv must be an environment name or false'); continue }
           if (key === 'commitDirty') { requireValue(typeof value === 'boolean', 'commitDirty must be a boolean'); continue }
           if (['domains', 'excludeEnv', 'secretNames'].includes(key)) { requireValue(Array.isArray(value) && value.every(x => typeof x === 'string' && x.length), key + ' must be a string array'); continue }
           if (key === 'nodeVersion') { requireValue([22, 24].includes(value as number), 'Hostinger nodeVersion must be 22 or 24'); continue }

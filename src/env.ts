@@ -55,7 +55,7 @@ async function projectModule(ctx: Context, path: string): Promise<EnvModule> {
 export async function env(ctx: Context, action: string) {
   const config = ctx.section('env')
   requireValue(typeof config.module === 'string' && config.module.length > 0, 'Configure env.module first')
-  requireValue(ctx.flags.env, 'env commands need an explicit --env')
+  ctx.requireEnvironment('env commands')
   const name = ctx.environment, allowed = config.environments ?? ['development', 'staging', 'production']
   requireValue(allowed.includes(name), `--env must be one of ${allowed.join(', ')}`)
   const module = await projectModule(ctx, config.module)

@@ -26,6 +26,8 @@
 
 ## Protected environments
 
+Environment-bound commands (`cloudflare`, `hostinger`, `hosting`, `env`, `prisma`) require `--env` or the project's `defaultEnvironment`; no environment is ever guessed. A default named `production` (or listed in `production.environments`) is protected like an explicit one.
+
 Commands with mutation guards require `--allow-production` when their environment is protected. The default protected name is `production`; configure `production.environments` to protect additional names. Vue builds and local resource generators are not a global permission boundary, and neither is `exec`.
 
 Configured production verification hooks execute before protected mutations. Keep stronger approval, identity, readiness and security checks in those hooks and/or post-sync verification. Do not assume an environment label proves which external account or deployment target a credential controls. Verify destination configuration before acting. Live reload is forbidden for the `production` environment.

@@ -9,6 +9,8 @@ export interface Images { source: string; background?: string; outputs?: { path:
 export interface NativeLocales { locales: Record<string, Record<string, string>>; defaultLocale: string; targets: { format: 'android' | 'apple'; directory: string; keys?: Record<string, string> }[] }
 export interface Config {
   version: 1;
+  /** Environment used by cloudflare, hostinger, hosting, env and prisma commands when --env is omitted (single-environment projects). */
+  defaultEnvironment?: string;
   output?: { banners?: boolean };
   production?: { environments?: string[]; verify?: Command[] };
   vue?: { root?: string; typecheck?: 'build' | 'noEmit' | false; modes?: Record<string, string> };
@@ -42,7 +44,7 @@ export interface EnvModule {
   header?(environment: string): string[];
 }
 
-export interface CloudflareSettings { kind: 'worker' | 'pages'; root?: string; config?: string; directory?: string; projectName?: string; accountId?: string; domains?: string[]; secretsFile?: string; secretNames?: string[]; commitDirty?: boolean; prepare?: Command[] }
+export interface CloudflareSettings { kind: 'worker' | 'pages'; root?: string; config?: string; directory?: string; projectName?: string; accountId?: string; domains?: string[]; secretsFile?: string; secretNames?: string[]; commitDirty?: boolean; branch?: string; wranglerEnv?: string | false; prepare?: Command[] }
 export interface CloudflareTarget extends CloudflareSettings { environments?: Record<string, Partial<CloudflareSettings>> }
 export interface HostingerSettings { domain?: string; username?: string; directory?: string; envFile?: string; excludeEnv?: string[]; databaseVariable?: string; nodeVersion?: 22 | 24; entryFile?: string; buildScript?: string; cron?: { command: string; schedule: string } }
 export interface HostingerTarget extends HostingerSettings { environments?: Record<string, Partial<HostingerSettings>> }

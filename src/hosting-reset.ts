@@ -14,7 +14,8 @@ const domainPattern = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9-]+$/u
 
 /** Destructive resource recreation, never a subscription/account reset. No deployment of consumer code here. */
 export async function hostingReset(ctx: Context, fetcher: typeof fetch = fetch, sleep = (ms: number) => delay(ms), mode: 'reset' | 'drop' | 'recreate' = 'reset') {
-  requireValue(ctx.flags.env && !['development', 'test', 'production', ...(ctx.config.production?.environments ?? [])].includes(ctx.environment), 'Hosting reset requires an explicit unprotected hosted environment; production is forbidden')
+  ctx.requireEnvironment('Hosting reset commands')
+  requireValue(!['development', 'test', 'production', ...(ctx.config.production?.environments ?? [])].includes(ctx.environment), 'Hosting reset requires an unprotected hosted environment (--env or defaultEnvironment); production is forbidden')
   const hBase = ctx.section('hostinger').targets[ctx.string('hostinger-target', 'api')]
   const cBase = ctx.section('cloudflare').targets[ctx.string('pages-target', 'web')]
   requireValue(hBase && cBase, 'Select configured Hostinger and Pages targets')

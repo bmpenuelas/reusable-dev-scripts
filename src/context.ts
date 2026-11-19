@@ -4,7 +4,7 @@ import { validateCommand } from './config.js'
 import type { Command, Config, Flags, Invocation, Runner } from './types.js'
 
 export class Context {
-  readonly environment: string
+  environment: string
   readonly dryRun: boolean
   readonly plan: Invocation[] = []
   /** Set by the executable boundary, not by programmatic workflow consumers. */
@@ -12,6 +12,18 @@ export class Context {
   constructor(public root: string, public config: Config, public flags: Flags, public runner: Runner = runProcess, public log: (message: string) => void = console.log) {
     this.environment = this.string('env', 'development'); this.dryRun = flags['dry-run'] === true
     requireValue(/^[a-zA-Z][\w-]*$/u.test(this.environment), 'Invalid environment name')
+  }
+  /**
+   * Commands that act on a named environment (cloudflare, hostinger, hosting, env, prisma) need one chosen on purpose.
+   * `--env` always wins; a single-environment project can set `defaultEnvironment` instead. Other commands never use the default,
+   * so it cannot switch on production guards for builds.
+   */
+  requireEnvironment(label: string): void {
+    if (this.flags.env !== undefined) return
+    const fallback = this.config.defaultEnvironment
+    requireValue(fallback, `${label} need an explicit --env, or defaultEnvironment in the configuration for a single-environment project`)
+    requireValue(/^[a-zA-Z][\w-]*$/u.test(fallback), 'Invalid environment name')
+    this.environment = fallback
   }
   string(name: string, fallback = ''): string { const value = this.flags[name]; requireValue(value === undefined || typeof value === 'string', `--${name} needs a value`); return value ?? fallback }
   boolean(name: string): boolean { const value = this.flags[name]; requireValue(value === undefined || typeof value === 'boolean', `--${name} does not take a value`); return value === true }

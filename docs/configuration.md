@@ -26,6 +26,25 @@ export default {
 
 The value must be boolean. Use `--banner` to enable a banner for one invocation, `--no-banner` to suppress it, or `RDS_BANNERS=0` / `RDS_BANNERS=1` in CI. Flags override the environment, which overrides this setting. See [result banners](commands.md#result-banners) for nested commands, startup errors, color support and dry-run behavior. The setting changes presentation only; it does not skip checks or suppress underlying tool diagnostics.
 
+## Single-environment projects
+
+Commands that act on a named environment (`cloudflare`, `hostinger`, `hosting`, `env` and `prisma`) need one chosen on purpose, so a deploy or migration never silently targets the wrong place. A project with only one environment does not have to repeat it on every command: set `defaultEnvironment`, and `--env` becomes optional for exactly those commands. `--env` still wins when given.
+
+```js
+export default {
+  version: 1,
+  defaultEnvironment: 'live',
+  cloudflare: {
+    targets: {
+      web: { kind: 'pages', directory: 'dist', projectName: 'example', branch: 'main' },
+      api: { kind: 'worker', config: 'wrangler.toml', wranglerEnv: false },
+    },
+  },
+}
+```
+
+Pages deployments use the target's `branch` (otherwise `main` for `production` and the environment name for anything else), and `wranglerEnv` chooses the Wrangler environment of a Worker (a name, or `false` for none). Builds, native commands, Capacitor, Android, stores and the other modules never use `defaultEnvironment`: their environment stays `development` unless `--env` is passed, so the default cannot switch on production guards for a build. Name the default `production` (or list it in `production.environments`) when its commands should keep requiring `--allow-production` and your verification hooks; any other name is unprotected. Hosting reset still refuses protected environments and needs its exact confirmations.
+
 ## External store credentials
 
 Keys can remain outside a checkout. Explicitly opt in for the two credential filename fields, using absolute environment-provided paths:
