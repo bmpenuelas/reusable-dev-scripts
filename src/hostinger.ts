@@ -5,7 +5,7 @@ import type { Context } from './context.js'
 
 /** Hostinger Web/Cloud hosting. Website/plan selection is explicit; never buys a plan or deletes data. */
 export async function hostinger(ctx: Context, action: string, fetcher: typeof fetch = fetch) {
-  ctx.requireEnvironment('Hostinger commands')
+  ctx.requireEnvironment('Hostinger commands', { implicit: true })
   const config = ctx.section('hostinger'), names = Object.keys(config.targets)
   const name = ctx.string('target', names.length === 1 ? names[0]! : '')
   const base = Object.hasOwn(config.targets, name) ? config.targets[name] : undefined

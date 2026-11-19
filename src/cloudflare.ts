@@ -5,7 +5,7 @@ import type { Context } from './context.js'
 import { credentials, payload, record, remoteJson } from './remote.js'
 
 export async function cloudflare(ctx: Context, action: string, fetcher: typeof fetch = fetch) {
-  ctx.requireEnvironment('Cloudflare commands')
+  ctx.requireEnvironment('Cloudflare commands', { implicit: true })
   const targets = ctx.section('cloudflare').targets
   requireValue(targets && typeof targets === 'object', 'Configure Cloudflare targets')
   const names = Object.keys(targets), name = ctx.string('target', names.length === 1 ? names[0]! : '')
@@ -52,9 +52,9 @@ export async function cloudflare(ctx: Context, action: string, fetcher: typeof f
   await ctx.guard(root); await ctx.hooks(target.prepare, ctx.root)
   const secrets = !ctx.dryRun && ctx.config.cloudflare?.credentialsFile ? await credentials(ctx, ctx.config.cloudflare.credentialsFile) : {}
   const providerEnv = { ...(secrets.CLOUDFLARE_API_TOKEN ? { CLOUDFLARE_API_TOKEN: secrets.CLOUDFLARE_API_TOKEN } : {}), ...(target.accountId || secrets.CLOUDFLARE_ACCOUNT_ID ? { CLOUDFLARE_ACCOUNT_ID: target.accountId ?? secrets.CLOUDFLARE_ACCOUNT_ID } : {}) }
-  if (action === 'deploy-pages') await ctx.run('wrangler', ['pages', 'deploy', inside(root, target.directory!), '--project-name', target.projectName!, '--branch', ctx.string('branch', target.branch ?? (ctx.environment === 'production' ? 'main' : ctx.environment)), ...(target.commitDirty ? ['--commit-dirty=true'] : [])], { cwd: root, env: providerEnv, label: 'Deploy Pages target' })
+  if (action === 'deploy-pages') await ctx.run('wrangler', ['pages', 'deploy', inside(root, target.directory!), '--project-name', target.projectName!, '--branch', ctx.string('branch', target.branch ?? (ctx.environment === 'production' || ctx.implicitEnvironment ? 'main' : ctx.environment)), ...(target.commitDirty ? ['--commit-dirty=true'] : [])], { cwd: root, env: providerEnv, label: 'Deploy Pages target' })
   else {
-    const shared = ['--config', inside(root, target.config!), ...(target.wranglerEnv === false ? [] : ['--env', target.wranglerEnv ?? ctx.environment])]
+    const shared = ['--config', inside(root, target.config!), ...(target.wranglerEnv === false || (target.wranglerEnv === undefined && ctx.implicitEnvironment) ? [] : ['--env', target.wranglerEnv ?? ctx.environment])]
     if (action === 'push-secrets') await ctx.run('wrangler', ['secret', 'bulk', ...shared], { cwd: root, env: providerEnv, input: JSON.stringify(secretValues ?? {}), label: 'Upload allowlisted Worker secrets' })
     else await ctx.run('wrangler', ['deploy', ...shared], { cwd: root, env: providerEnv, label: 'Deploy Worker target' })
   }

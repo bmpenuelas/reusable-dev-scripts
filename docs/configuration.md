@@ -45,6 +45,8 @@ export default {
 
 Pages deployments use the target's `branch` (otherwise `main` for `production` and the environment name for anything else), and `wranglerEnv` chooses the Wrangler environment of a Worker (a name, or `false` for none). Builds, native commands, Capacitor, Android, stores and the other modules never use `defaultEnvironment`: their environment stays `development` unless `--env` is passed, so the default cannot switch on production guards for a build. Name the default `production` (or list it in `production.environments`) when its commands should keep requiring `--allow-production` and your verification hooks; any other name is unprotected. Hosting reset still refuses protected environments and needs its exact confirmations.
 
+A project that has no notion of environments does not need a name at all. When the configuration has no `production` section, no `env` module and no per-environment target overrides (`environments` on a Cloudflare or Hostinger target), `cloudflare` and `hostinger` commands use the neutral environment `default` without `--env` or `defaultEnvironment`. In that case the Pages branch is `main` unless the target sets `branch`, and Workers get no Wrangler `--env` unless the target sets `wranglerEnv`. `prisma`, `env` and hosting reset never fall back: they touch data or per-environment files, so they always need `--env` or `defaultEnvironment`. As soon as the project configures environments, the fallback stops applying and an explicit environment is required again.
+
 ## External store credentials
 
 Keys can remain outside a checkout. Explicitly opt in for the two credential filename fields, using absolute environment-provided paths:

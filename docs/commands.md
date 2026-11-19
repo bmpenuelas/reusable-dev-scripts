@@ -148,7 +148,7 @@ Set `STORE_RUBY` if Ruby >=3.3 isn't on PATH. macOS Homebrew installations are d
 
 `cloudflare.targets` maps names to `{ kind: 'worker'|'pages', root?, config?, directory?, projectName?, prepare?, secretsFile?, secretNames?, commitDirty? }`.
 
-Select `--target` when more than one exists. **An environment is required**: pass `--env`, or set the top-level `defaultEnvironment` for a project with only one (see [single-environment projects](configuration.md#single-environment-projects)). Worker `config` and Pages `directory` are target-root-relative. Preparation hooks run in config root. Secrets files are **config-root-relative**.
+Select `--target` when more than one exists. **An environment is required** (pass `--env`, or set the top-level `defaultEnvironment` for a project with only one) unless the project configures no environments at all, in which case the neutral `default` is used (see [single-environment projects](configuration.md#single-environment-projects)). Worker `config` and Pages `directory` are target-root-relative. Preparation hooks run in config root. Secrets files are **config-root-relative**.
 
 - `deploy-worker`: explicit Wrangler config + environment. The environment is passed to Wrangler as `--env`; set the target's `wranglerEnv` to another name, or to `false` when the Worker only has top-level configuration.
 - `deploy-pages`: built directory + project name + branch; branch is the target's `branch`, else `main` for production, else the environment name. `commitDirty: true` adds `--commit-dirty=true` so Wrangler deploys from a working tree with uncommitted changes without its warning; the default leaves Wrangler's behavior unchanged.

@@ -33,7 +33,7 @@ Use `npm exec -- rds <module> <command> --help` after installing the dependency.
 
 Run `npm exec -- rds --help` and read the command list instead of relying on memory: new releases add families. Today they cover Vue, Capacitor (sync, versions, assets, locales, screenshots, live reload), Android (build, install, ADB), mobile stores (metadata checks, listing/build uploads, read-only `store verify`), VS Code and browser extensions, Electron (dev, assets, build, notarize), Swift, Cloudflare and Hostinger deployment, destructive hosting reset, and local development (`dev start`, `wait tcp`, `env`, `prisma`). Scan the project's scripts for each family, including ones that look unrelated to releases such as dev-server launchers, readiness loops, environment-file generators and migration runners.
 
-A project with only one environment sets `defaultEnvironment` once instead of passing `--env` to every cloudflare, hostinger, hosting, env and prisma command; do not invent a fake environment per alias.
+A project with only one environment sets `defaultEnvironment` once instead of passing `--env` to every cloudflare, hostinger, hosting, env and prisma command; do not invent a fake environment per alias. A project that configures no environments at all needs neither: cloudflare and hostinger use the neutral `default` environment (prisma, env and hosting reset still require an explicit one).
 
 Application policy that must run around a shared command belongs in its documented hooks (for example `capacitor.afterBuild`, `store.hooks.beforeUpload` and `afterBuildUpload`, `production.verify`), not in a reimplementation of the command. `rds` never commits, pushes, tags or submits for review; keep those steps in a project hook or script.
 

@@ -5,6 +5,7 @@ Behavior that consumers can notice. Pin an exact version and read the relevant e
 ## 0.5.0
 
 - Added top-level `defaultEnvironment` so single-environment projects can run `cloudflare`, `hostinger`, `hosting`, `env` and `prisma` commands without `--env`. `--env` wins when given; other commands never use it, and a default named `production` keeps the production guard.
+- Projects that configure no environments at all (no `production` section, no `env` module, no per-environment target overrides) need no `--env` or `defaultEnvironment` for `cloudflare` and `hostinger`: the neutral `default` environment is used, the Pages branch is `main` and Workers get no Wrangler `--env` unless configured. `prisma`, `env` and hosting reset never fall back.
 - Added Cloudflare target settings `branch` (Pages) and `wranglerEnv` (Workers: a name, or `false` to omit `--env`).
 
 ## 0.4.0

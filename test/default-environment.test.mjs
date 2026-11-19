@@ -24,7 +24,7 @@ test('--env still wins over defaultEnvironment, and without either the command a
   const chosen = await fixture(pages({}, { defaultEnvironment: 'live' }), { env: 'staging' })
   await cloudflare(chosen.ctx, 'deploy-pages')
   assert.equal(chosen.calls[0].args[chosen.calls[0].args.indexOf('--branch') + 1], 'staging')
-  const missing = await fixture(pages())
+  const missing = await fixture(pages({}, { production: { environments: ['production'] } }))
   await assert.rejects(cloudflare(missing.ctx, 'deploy-pages'), /explicit --env, or defaultEnvironment/)
   assert.equal(missing.calls.length, 0)
 })
@@ -64,7 +64,7 @@ test('hostinger, env, prisma and hosting reset accept the default but still fail
     ['hosting', c => hostingReset(c)],
   ]
   for (const [name, run] of commands) {
-    const without = await fixture({ version: 1, [name === 'hosting' ? 'hostinger' : name]: { targets: {}, module: 'm.mjs', envFile: '.env' } })
+    const without = await fixture({ version: 1, production: { environments: ['production'] }, [name === 'hosting' ? 'hostinger' : name]: { targets: {}, module: 'm.mjs', envFile: '.env' } })
     await assert.rejects(run(without.ctx), /explicit --env/, name)
     const withDefault = await fixture({ version: 1, defaultEnvironment: 'staging', [name === 'hosting' ? 'hostinger' : name]: { targets: {}, module: 'm.mjs', envFile: '.env' } })
     await assert.rejects(run(withDefault.ctx), error => !/explicit --env/.test(error.message), `${name} moved past the environment requirement`)
@@ -81,4 +81,27 @@ test('defaultEnvironment, branch and wranglerEnv are validated', () => {
   assert.throws(() => validateConfig(pages({ branch: '--oops' })), /branch/)
   assert.throws(() => validateConfig(worker({ wranglerEnv: true })), /wranglerEnv/)
   assert.throws(() => validateConfig(worker({ wranglerEnv: 'bad env' })), /wranglerEnv/)
+})
+
+test('a project without any environments deploys with the neutral default, but data commands still ask', async () => {
+  const f = await fixture(pages())
+  await cloudflare(f.ctx, 'deploy-pages')
+  assert.equal(f.ctx.environment, 'default')
+  assert.equal(f.ctx.implicitEnvironment, true)
+  assert.equal(f.calls[0].args[f.calls[0].args.indexOf('--branch') + 1], 'main')
+  const w = await fixture(worker())
+  await cloudflare(w.ctx, 'deploy-worker')
+  assert.ok(!w.calls[0].args.includes('--env'))
+  const named = await fixture(worker({ wranglerEnv: 'prod' }))
+  await cloudflare(named.ctx, 'deploy-worker')
+  assert.equal(named.calls[0].args[named.calls[0].args.indexOf('--env') + 1], 'prod')
+  const database = await fixture({ version: 1, prisma: { root: '.', envFile: '.env' } })
+  await assert.rejects(prisma(database.ctx, 'status'), /explicit --env/)
+})
+
+test('configuring environments turns the neutral fallback off', async () => {
+  const withOverrides = await fixture(pages({ environments: { staging: { projectName: 'staging' } } }))
+  await assert.rejects(cloudflare(withOverrides.ctx, 'deploy-pages'), /explicit --env/)
+  const withProduction = await fixture(pages({}, { production: { environments: ['production'] } }))
+  await assert.rejects(cloudflare(withProduction.ctx, 'deploy-pages'), /explicit --env/)
 })

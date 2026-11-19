@@ -26,7 +26,7 @@
 
 ## Protected environments
 
-Environment-bound commands (`cloudflare`, `hostinger`, `hosting`, `env`, `prisma`) require `--env` or the project's `defaultEnvironment`; no environment is ever guessed. A default named `production` (or listed in `production.environments`) is protected like an explicit one.
+Environment-bound commands (`cloudflare`, `hostinger`, `hosting`, `env`, `prisma`) require `--env` or the project's `defaultEnvironment`. The only exception is a project that configures no environments at all (no `production` section, no `env` module, no per-environment target overrides): `cloudflare` and `hostinger` then use the neutral, unprotected environment `default`, and `prisma`, `env` and hosting reset still refuse to guess. A default named `production` (or listed in `production.environments`) is protected like an explicit one.
 
 Commands with mutation guards require `--allow-production` when their environment is protected. The default protected name is `production`; configure `production.environments` to protect additional names. Vue builds and local resource generators are not a global permission boundary, and neither is `exec`.
 

@@ -3,8 +3,16 @@ import { inside, requireValue, runProcess } from './runtime.js'
 import { validateCommand } from './config.js'
 import type { Command, Config, Flags, Invocation, Runner } from './types.js'
 
+function hasEnvironments(config: Config): boolean {
+  if (config.production !== undefined || config.env !== undefined) return true
+  const targets = [...Object.values(config.cloudflare?.targets ?? {}), ...Object.values(config.hostinger?.targets ?? {})]
+  return targets.some(target => target.environments !== undefined)
+}
+
 export class Context {
   environment: string
+  /** True when no environment was named anywhere and the neutral one was assumed (a project without environments). */
+  implicitEnvironment = false
   readonly dryRun: boolean
   readonly plan: Invocation[] = []
   /** Set by the executable boundary, not by programmatic workflow consumers. */
@@ -17,11 +25,19 @@ export class Context {
    * Commands that act on a named environment (cloudflare, hostinger, hosting, env, prisma) need one chosen on purpose.
    * `--env` always wins; a single-environment project can set `defaultEnvironment` instead. Other commands never use the default,
    * so it cannot switch on production guards for builds.
+   * With `implicit`, a project that configures no environments at all (no `production` section, no per-environment target
+   * overrides, no `env` module) gets the neutral `default` environment instead of an error. Destructive or data-bearing commands
+   * (prisma, env files, hosting reset) never pass `implicit`: they always need a deliberate name.
    */
-  requireEnvironment(label: string): void {
+  requireEnvironment(label: string, options: { implicit?: boolean } = {}): void {
     if (this.flags.env !== undefined) return
     const fallback = this.config.defaultEnvironment
-    requireValue(fallback, `${label} need an explicit --env, or defaultEnvironment in the configuration for a single-environment project`)
+    if (fallback === undefined && options.implicit && !hasEnvironments(this.config)) {
+      this.environment = 'default'
+      this.implicitEnvironment = true
+      return
+    }
+    requireValue(fallback, `${label} need an explicit --env, or defaultEnvironment in the configuration for a project with a single environment`)
     requireValue(/^[a-zA-Z][\w-]*$/u.test(fallback), 'Invalid environment name')
     this.environment = fallback
   }

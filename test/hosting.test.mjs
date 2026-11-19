@@ -94,8 +94,8 @@ test('Hostinger dry-run needs no credentials, env files, upload tools, or provid
   assert.match(f.messages.join('\n'), /api.example.com/)
 })
 
-test('remote mutations require explicit environment, confirmation, and production authorization', async () => {
-  for (const [flags, message] of [[{}, /explicit --env/], [{ env: 'staging' }, /--yes/], [{ env: 'production', yes: true }, /--allow-production/]]) {
+test('remote mutations require confirmation (the neutral default environment applies without environments), and production authorization', async () => {
+  for (const [flags, message] of [[{}, /--yes/], [{ env: 'staging' }, /--yes/], [{ env: 'production', yes: true }, /--allow-production/]]) {
     const f = await hosting(flags)
     await assert.rejects(hostinger(f.ctx, 'setup', async () => { throw new Error('must not request') }), message)
   }

@@ -30,7 +30,7 @@ test('browser rejects output inside source directory and dry-run does not write'
   f.ctx.config.browser.output = 'release/extension.zip'; await browserPackage(f.ctx); assert.equal(existsSync(join(f.root, 'release')), false)
 })
 test('Cloudflare requires a selected kind and explicit environment', async () => {
-  const f = await fixture({ version: 1, cloudflare: { targets: { worker: { kind: 'worker', config: 'wrangler.toml' } } } }, { 'dry-run': true })
+  const f = await fixture({ version: 1, production: { environments: ['production'] }, cloudflare: { targets: { worker: { kind: 'worker', config: 'wrangler.toml' } } } }, { 'dry-run': true })
   await assert.rejects(cloudflare(f.ctx, 'deploy-worker'), /explicit/)
   f.ctx.flags.env = 'staging'; await assert.rejects(cloudflare(f.ctx, 'deploy-pages'), /Pages/)
 })
