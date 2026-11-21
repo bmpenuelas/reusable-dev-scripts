@@ -24,6 +24,7 @@ An alias named `lint` might only run a typechecker. A script named `bundle` migh
 | Local development loop | `dev`, `wait` | Which processes exist, their commands, and what "ready" means for the application |
 | Per-environment settings | `env` | Defaults, validation rules and generated file formats, kept in one project module |
 | Prisma migrations on remote databases | `prisma` | Where the database URL comes from and any stronger production approval |
+| PlatformIO firmware builds and tool calls | `platformio` | The firmware directory, environments to build and any flashing or signing policy |
 
 One repository can use several modules. There is no single project preset to select, and optional modules do not need configuration until used.
 
@@ -106,7 +107,9 @@ Keep an acceptance record of commands and artifact checks, without credentials o
 | Export localized iOS text | `rds store export --platform ios` |
 | Package a VS Code extension | `rds vscode package` |
 | Publish the same VSIX to both registries | `rds vscode publish --registry all` |
-| Start API and frontend together | `rds dev start` |
+| Start API and frontend together | `rds dev start` (one terminal) or `rds dev tabs` (one terminal tab per process) |
+| Start the services plus a phone live-reload session on demand | `dev.processes` with an `optional: true` entry and `rds dev tabs --with <name>` |
+| Give a Wear OS module its own version-code range | `capacitor.androidModules: [{ project, versionCodeOffset }]` |
 | Wait for a database before migrating | `rds wait tcp --target database` |
 | Template, validate and generate environment files | `rds env template|validate|generate|check --env <name>` |
 | Migrate a staging or production database | `rds prisma migrate --env staging` |

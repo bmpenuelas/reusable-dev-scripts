@@ -19,13 +19,14 @@ test('every public command can plan without writes, subprocesses or credential v
     android: { appId: 'app.fixture' },
     store: { root: 'store', locales: ['en-US'], androidId: 'app.fixture', playKey: 'never-read-credentials.json' },
     vscode: {}, electron: { assets: { source: 'icon.png', outputs: [{ path: 'desktop/icon.png', width: 16 }] } }, swift: { executable: 'Example', plist: 'Info.plist', entitlements: 'app.entitlements', icon: 'icon.png' },
-    cloudflare: { targets: { worker: { kind: 'worker', config: 'wrangler.toml', secretsFile: 'never-read-credentials.json', secretNames: ['SESSION_SECRET'] }, pages: { kind: 'pages', directory: 'web', projectName: 'fixture' } } },
+    cloudflare: { targets: { worker: { kind: 'worker', config: 'wrangler.toml', d1Database: 'fixture-db', secretsFile: 'never-read-credentials.json', secretNames: ['SESSION_SECRET'] }, pages: { kind: 'pages', directory: 'web', projectName: 'fixture' } } },
     hostinger: { targets: { api: { domain: 'api.example.com', username: 'account_example', directory: 'bundle', envFile: 'never-read.env', databaseVariable: 'DATABASE_URL' } } },
     browser: { directory: 'extension/dist', output: 'extension.zip' },
     dev: { processes: [{ name: 'one', command: ['node', '-e', 'NEVER_EXECUTE_OR_LOG_SECRET'] }, { name: 'two', command: ['node', '-e', ''] }] },
     wait: { targets: { database: { host: '127.0.0.1', port: 9 } } },
     env: { module: 'scripts/environments.mjs' },
-    prisma: { envFile: '.env.{env}' }
+    prisma: { envFile: '.env.{env}' },
+    platformio: { root: '.' }
   }
   const f = await fixture(config); await f.file('reusable-dev-scripts.config.json', JSON.stringify(config))
   await f.file('scripts/environments.mjs', "export const defaults = () => ({ greeting: 'hello' })\nexport const outputs = (env, config) => [{ path: 'generated.env', content: `GREETING=${config.greeting}\\n` }]\n")
@@ -40,6 +41,7 @@ test('every public command can plan without writes, subprocesses or credential v
     if (command.startsWith('env ') || command.startsWith('prisma ')) args.push('--env', 'staging')
     if (command === 'exec') args.push('--', 'node', '-e', 'NEVER_EXECUTE_OR_LOG_SECRET')
     if (command === 'store run') args.push('--', 'lanes')
+    if (command === 'platformio') args.push('--', 'run', '-e', 'NEVER_EXECUTE_OR_LOG_SECRET')
     const logs = []
     await main(args, () => { throw new Error(`Unexpected process execution for ${command}`) }, line => logs.push(line))
     assert.ok(!logs.join('').includes('NEVER_EXECUTE_OR_LOG_SECRET'))

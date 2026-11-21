@@ -10,7 +10,7 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'hostinger', 'defaultEnvironment']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'platformio', 'hostinger', 'defaultEnvironment']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
     if (key !== 'version' && key !== 'defaultEnvironment') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
@@ -18,13 +18,13 @@ export function validateConfig(value: unknown): Config {
   const fields: Record<string, string[]> = {
     output: ['banners'],
     production: ['environments', 'verify'], vue: ['root', 'typecheck', 'modes'],
-    capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterBuild', 'afterSync', 'verify'],
+    capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterBuild', 'afterSync', 'verify', 'androidModules'],
     android: ['root', 'appId', 'module', 'apk', 'aab', 'mapping', 'javaHome', 'sdkRoot'],
     store: ['root', 'locales', 'appLocales', 'defaultLocale', 'defaultLocales', 'iosDevices', 'androidId', 'iosId', 'appleKey', 'playKey', 'allowExternalCredentials', 'iosProject', 'iosScheme', 'hooks', 'versionPackage'],
     electron: ['root', 'url', 'start', 'assets', 'output', 'builderConfig', 'notaryProfile', 'prepare'],
     swift: ['root', 'executable', 'plist', 'resources', 'entitlements', 'output', 'identity', 'icon', 'iconOutput'],
     vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets', 'credentialsFile'], hostinger: ['targets', 'credentialsFile'], browser: ['root', 'directory', 'output', 'prepare'],
-    dev: ['root', 'processes'], wait: ['targets'], env: ['directory', 'module', 'environments', 'autoCreate', 'hints'], prisma: ['root', 'envFile', 'variable']
+    dev: ['root', 'processes'], wait: ['targets'], env: ['directory', 'module', 'environments', 'autoCreate', 'hints'], prisma: ['root', 'envFile', 'variable'], platformio: ['root', 'coreDir']
   }
   if (data.defaultEnvironment !== undefined) requireValue(typeof data.defaultEnvironment === 'string' && /^[a-zA-Z][\w-]*$/u.test(data.defaultEnvironment), 'defaultEnvironment must be an environment name')
   const keys = (entry: unknown, allowed: string[], label: string) => {
@@ -46,10 +46,18 @@ export function validateConfig(value: unknown): Config {
   keys(config.capacitor?.environmentByPlatform, ['android', 'ios'], 'environmentByPlatform')
   keys(config.capacitor?.live, ['host', 'port', 'https', 'ca', 'timeout'], 'capacitor.live')
   keys(config.capacitor?.screenshots, ['output', 'sizes'], 'capacitor.screenshots')
+  if (config.capacitor?.androidModules !== undefined) {
+    requireValue(Array.isArray(config.capacitor.androidModules) && config.capacitor.androidModules.length > 0, 'capacitor.androidModules must be a non-empty array')
+    for (const module of config.capacitor.androidModules) {
+      keys(module, ['project', 'versionCodeOffset'], 'capacitor.androidModules entry')
+      requireValue(typeof module.project === 'string' && module.project.length > 0 && !module.project.includes('\0'), 'capacitor.androidModules project must be a non-empty build.gradle path')
+      if (module.versionCodeOffset !== undefined) requireValue(Number.isSafeInteger(module.versionCodeOffset) && module.versionCodeOffset >= 0, 'capacitor.androidModules versionCodeOffset must be a non-negative integer')
+    }
+  }
   keys(config.store?.hooks, ['beforeUpload', 'afterBuildUpload'], 'store.hooks')
   keys(config.store?.iosDevices, ['iphone', 'ipad', 'watch'], 'store.iosDevices')
   if (config.production?.environments) requireValue(Array.isArray(config.production.environments) && config.production.environments.length > 0 && config.production.environments.every(x => typeof x === 'string' && x.length), 'production.environments must be a non-empty string array')
-  const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'commitDirty', 'branch', 'wranglerEnv', 'prepare']
+  const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'commitDirty', 'branch', 'wranglerEnv', 'prepare', 'zoneId', 'wwwRedirect', 'redirectRef', 'd1Database', 'secretsModule']
   const hostingerFields = ['domain', 'username', 'directory', 'envFile', 'excludeEnv', 'databaseVariable', 'nodeVersion', 'entryFile', 'buildScript', 'cron']
   for (const [provider, fields] of [[config.cloudflare, cloudflareFields], [config.hostinger, hostingerFields]] as const) {
     if (!provider) continue
@@ -69,6 +77,10 @@ export function validateConfig(value: unknown): Config {
           if (key === 'branch') { requireValue(typeof value === 'string' && /^[\w][\w./-]*$/u.test(value), 'Pages branch must be a branch name'); continue }
           if (key === 'wranglerEnv') { requireValue(value === false || (typeof value === 'string' && /^[a-zA-Z][\w-]*$/u.test(value)), 'wranglerEnv must be an environment name or false'); continue }
           if (key === 'commitDirty') { requireValue(typeof value === 'boolean', 'commitDirty must be a boolean'); continue }
+          if (key === 'wwwRedirect') { requireValue(typeof value === 'boolean', 'wwwRedirect must be a boolean'); continue }
+          if (key === 'zoneId') { requireValue(typeof value === 'string' && /^[a-fA-F0-9]{32}$/u.test(value), 'zoneId must be a 32-character hexadecimal zone ID'); continue }
+          if (key === 'redirectRef') { requireValue(typeof value === 'string' && /^[A-Za-z0-9_]{1,50}$/u.test(value), 'redirectRef must be letters, digits and underscores'); continue }
+          if (key === 'd1Database') { requireValue(typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u.test(value), 'd1Database must be a database name'); continue }
           if (['domains', 'excludeEnv', 'secretNames'].includes(key)) { requireValue(Array.isArray(value) && value.every(x => typeof x === 'string' && x.length), key + ' must be a string array'); continue }
           if (key === 'nodeVersion') { requireValue([22, 24].includes(value as number), 'Hostinger nodeVersion must be 22 or 24'); continue }
           if (key === 'cron') {
@@ -87,10 +99,11 @@ export function validateConfig(value: unknown): Config {
     requireValue(Array.isArray(config.dev.processes) && config.dev.processes.length > 0, 'dev.processes must be a non-empty array')
     const names = new Set<string>()
     for (const entry of config.dev.processes) {
-      keys(entry, ['name', 'command', 'root', 'environment'], 'dev process')
+      keys(entry, ['name', 'command', 'root', 'environment', 'optional'], 'dev process')
       requireValue(typeof entry.name === 'string' && /^[\w.-]+$/u.test(entry.name) && !names.has(entry.name), 'dev process names must be unique and use letters, digits, dot, dash or underscore')
       names.add(entry.name); validateCommand(entry.command)
       if (entry.root !== undefined) requireValue(typeof entry.root === 'string' && entry.root.length > 0, 'dev process root must be a non-empty string')
+      if (entry.optional !== undefined) requireValue(typeof entry.optional === 'boolean', 'dev process optional must be a boolean')
     }
   }
   if (config.wait) requireValue(config.wait.targets && typeof config.wait.targets === 'object' && !Array.isArray(config.wait.targets), 'wait.targets must be an object')
@@ -106,6 +119,7 @@ export function validateConfig(value: unknown): Config {
   }
   if (config.prisma) requireValue(typeof config.prisma.envFile === 'string' && config.prisma.envFile.length > 0, 'prisma.envFile must be a non-empty string')
   if (config.prisma?.variable !== undefined) requireValue(typeof config.prisma.variable === 'string' && /^[A-Za-z_]\w*$/u.test(config.prisma.variable), 'prisma.variable must be an environment variable name')
+  if (config.platformio?.coreDir !== undefined) requireValue(typeof config.platformio.coreDir === 'string' && config.platformio.coreDir.length > 0 && !config.platformio.coreDir.includes('\0'), 'platformio.coreDir must be a non-empty path')
   hookList(config.production?.verify)
   for (const section of [config.capacitor, config.electron, config.vscode, config.browser]) hookList(section?.prepare)
   hookList(config.capacitor?.afterBuild); hookList(config.capacitor?.afterSync); hookList(config.capacitor?.verify); hookList(config.store?.hooks?.beforeUpload); hookList(config.store?.hooks?.afterBuildUpload)

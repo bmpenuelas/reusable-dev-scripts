@@ -227,6 +227,8 @@ export default {
         config: 'wrangler.toml',
         secretsFile: '.secrets/worker.env',
         secretNames: ['SESSION_SECRET', 'SERVICE_API_KEY'],
+        // Optional project rules for push-secrets (provenance, strength, derived values); see the Cloudflare command reference.
+        secretsModule: 'scripts/worker-secrets.mjs',
       },
       website: {
         kind: 'pages',
@@ -251,6 +253,7 @@ export default {
   dev: { processes: [{ name: 'api', command: ['npm', 'run', 'dev', '--workspace', 'backend'] }] },
   wait: { targets: { database: { variable: 'DATABASE_URL', envFile: 'backend/.env' } } },
   prisma: { root: 'backend', envFile: 'backend/.env.{env}' },
+  platformio: { root: 'firmware' },
   production: { environments: ['production'], verify: [['rds', 'env', 'check', '--env', '{env}']] },
 }
 ```

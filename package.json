@@ -1,6 +1,6 @@
 {
   "name": "reusable-dev-scripts",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "license": "MIT",
   "description": "Type-specific development and release tooling for Vue, Capacitor, stores, extensions and desktop apps",
   "type": "module",
@@ -11,6 +11,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./json5": {
+      "types": "./dist/json5.d.ts",
+      "import": "./dist/json5.js"
+    },
+    "./secret-env": {
+      "types": "./dist/secret-env.d.ts",
+      "import": "./dist/secret-env.js"
     }
   },
   "files": [

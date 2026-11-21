@@ -47,6 +47,12 @@ export async function versions(ctx: Context) {
   if (platform !== 'ios') {
     const android = inside(root, config.androidProject ?? 'android/app/build.gradle')
     if (existsSync(android)) outputs.push([android, syncAndroid(await readFile(android, 'utf8'), version, build)])
+    for (const module of config.androidModules ?? []) {
+      const path = inside(root, module.project), offsetBuild = build + (module.versionCodeOffset ?? 0)
+      requireValue(existsSync(path), 'A configured Android module build file was not found')
+      requireValue(Number.isSafeInteger(offsetBuild) && offsetBuild <= 2_100_000_000, 'Native build number with the module offset exceeds the Android limit')
+      outputs.push([path, syncAndroid(await readFile(path, 'utf8'), version, offsetBuild)])
+    }
   }
   if (platform !== 'android') {
     const ios = inside(root, config.iosProject ?? 'ios/App/App.xcodeproj/project.pbxproj')

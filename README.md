@@ -27,7 +27,7 @@ npm install --save-dev --save-exact reusable-dev-scripts
 npm exec -- rds --help
 ```
 
-Commit the application's `package.json` and lockfile. `--save-exact` pins the resolved version; use `reusable-dev-scripts@<version>` when selecting a specific release. CI should use `npm ci`. This installation path requires a published release; before the first publication, use a [local checkout or packed tarball](#local-toolkit-development).
+Commit the application's `package.json` and lockfile. `--save-exact` pins the resolved version; use `reusable-dev-scripts@<version>` when selecting a specific release. CI should use `npm ci`.
 
 The CLI ships as compiled JavaScript; consumers do not need a TypeScript loader or a checkout of this repository.
 
@@ -165,11 +165,12 @@ Each command below starts with `rds`. Configure only the modules you use.
 | VS Code | `vscode package`, `publish` |
 | Electron | `electron dev`, `assets`, `clean`, `build`, `notarize` |
 | Native Swift | `swift icons`, `bundle` |
-| Cloudflare | `cloudflare setup-pages`, `deploy-worker`, `deploy-pages`, `push-secrets` |
+| Cloudflare | `cloudflare setup-pages`, `deploy-worker`, `migrate-d1`, `deploy-pages`, `push-secrets` |
 | Hostinger | `hostinger setup`, `deploy` |
 | Hosting reset | `hosting reset`, `drop`, `recreate` (destructive, unprotected environments only) |
 | Browser extensions | `browser package` |
-| Local development | `dev start`, `wait tcp`, `env template`, `validate`, `generate`, `check`, `prisma migrate`, `status` |
+| Local development | `dev start`, `dev tabs`, `wait tcp`, `env template`, `validate`, `generate`, `check`, `prisma migrate`, `status` |
+| Firmware tooling | `platformio -- <pio arguments>` |
 
 Get exact supported flags without loading application configuration:
 

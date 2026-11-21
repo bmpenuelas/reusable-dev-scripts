@@ -72,6 +72,8 @@ Default web builds use the Vue module. A custom build hook owns its own typechec
 
 `afterBuild` receives the same platform environment and `{env}`, `{platform}`, `{root}` argv substitutions as the build. It runs once per platform, also in `prepare` and the sync phase of `live`, but not for standalone `vue build`. A failed build or hook stops the pipeline before Capacitor; dry-run only plans it.
 
+`capacitor.androidModules: [{ project, versionCodeOffset? }]` lists further Gradle modules, such as a Wear OS app, that share the package version. `project` is the module's `build.gradle` relative to the Capacitor root and must exist; it receives the same version name and the native build number plus `versionCodeOffset` (default 0), so each form factor can use its own version-code range. The Android limit applies to the number including the offset, `--check` covers these files, and they are only touched for Android or `all` platforms.
+
 Version files default to `android/app/build.gradle` and `ios/App/App.xcodeproj/project.pbxproj`, relative to Capacitor root; override with `androidProject` / `iosProject`. `packageJson` is relative to **config root**. The native build formula is `major*1_000_000 + minor*1_000 + patch`, minimum 1; minor/patch must be <=999 and Android's integer bound is enforced. iOS's existing integer build numbers are never decreased. Gradle settings already derived from package.json remain expressions. Unsupported version settings fail before bumping.
 
 ### Assets
@@ -146,13 +148,20 @@ Set `STORE_RUBY` if Ruby >=3.3 isn't on PATH. macOS Homebrew installations are d
 
 ## Cloudflare
 
-`cloudflare.targets` maps names to `{ kind: 'worker'|'pages', root?, config?, directory?, projectName?, prepare?, secretsFile?, secretNames?, commitDirty? }`.
+`cloudflare.targets` maps names to `{ kind: 'worker'|'pages', root?, config?, directory?, projectName?, prepare?, secretsFile?, secretNames?, secretsModule?, commitDirty?, zoneId?, wwwRedirect?, redirectRef?, d1Database? }`.
 
 Select `--target` when more than one exists. **An environment is required** (pass `--env`, or set the top-level `defaultEnvironment` for a project with only one) unless the project configures no environments at all, in which case the neutral `default` is used (see [single-environment projects](configuration.md#single-environment-projects)). Worker `config` and Pages `directory` are target-root-relative. Preparation hooks run in config root. Secrets files are **config-root-relative**.
 
 - `deploy-worker`: explicit Wrangler config + environment. The environment is passed to Wrangler as `--env`; set the target's `wranglerEnv` to another name, or to `false` when the Worker only has top-level configuration.
 - `deploy-pages`: built directory + project name + branch; branch is the target's `branch`, else `main` for production, else the environment name. `commitDirty: true` adds `--commit-dirty=true` so Wrangler deploys from a working tree with uncommitted changes without its warning; the default leaves Wrangler's behavior unchanged.
-- `push-secrets`: reads dotenv/JSON, checks an explicit name allowlist, sends JSON on stdin to `wrangler secret bulk`. Other variables cannot be uploaded.
+- `migrate-d1`: `wrangler d1 migrations apply <d1Database> --remote` with the Worker target's explicit config and environment (`--env`, `wranglerEnv`), behind the same production guard and `prepare` hooks as `deploy-worker`. `d1Database` is the database name.
+- `setup-pages`: creates the Direct Upload project and its custom domains (needs `--yes`). With `zoneId` it also keeps a proxied CNAME from each domain to `<projectName>.pages.dev`: a missing record is created, an unproxied one is made proxied, and a record that points anywhere else fails the command instead of being re-pointed. `wwwRedirect: true` (requires `zoneId` and exactly one domain, which must be the zone apex or the step is skipped) additionally keeps a proxied `www` CNAME to the apex and a Single Redirect rule identified by `redirectRef` (default `rds_www_redirect`): 301, path and query kept. Other redirect rules in the zone are never changed. A pre-existing `www` record that is not exactly that CNAME fails the command.
+- `push-secrets [--secrets-file <path>]`: reads the secrets file, optionally applies the project's own rules, checks an explicit name allowlist and sends JSON on stdin to `wrangler secret bulk`. Other variables cannot be uploaded. The order is: production guard, read and parse the file, `secretsModule`, then the `prepare` hooks, then the upload, so a rejected file causes no side effects. `--secrets-file` replaces `secretsFile` for one run and must stay inside the project.
+
+  The file is `.json` (an object) or NAME=value lines read **strictly**: a line that is not `NAME=value`, a repeated name and an unterminated quoted value are errors (naming the line or variable, never a value); names are upper-case letters, digits and underscore; a value may be quoted with `"`, `'` or a backtick and then continues over lines until one ends with that quote; `
+` becomes a newline; an unquoted value ends at the first `#`, as in Node's own dotenv parser. `parseSecretEnv` is exported from the package and from `reusable-dev-scripts/secret-env` so project scripts read the same file the same way.
+
+  `secretsModule` names a project module (config-root-relative) that holds the rules rds cannot know. It exports `secrets({ environment, target, file, root, values })`, where `values` is the parsed file (a frozen copy) and `file` its absolute path. It throws to stop the upload (the message must not contain a value) and returns the values to upload: the input plus anything the project derives or overrides, for example a credential read from another reviewed file. Only names in `secretNames` are sent; every one must be present and non-empty. Typical rules: the file must declare which environment it belongs to, a development file is refused, strength and uniqueness checks, cross-environment reuse, and validity checks such as a PEM parse. A dry-run reads no file and loads no module.
 
 No infrastructure provisioning, database wiping, app configuration generation or account inference is performed. Preserve existing security/header/domain policy in the consuming project.
 
@@ -168,9 +177,13 @@ Commands and hooks resolve `pnpm` through the running pnpm when rds was started 
 
 `rds dev start`
 
-`dev: { root?, processes: [{ name, command, root?, environment? }] }`. Every process starts at once with an argv `command`, run in `dev.root` (or the process `root` inside it), and its output is printed line by line with a colored `[name]` prefix. `environment` accepts the same `{env}` / `{root}` placeholders as other environment mappings, and `FORCE_COLOR=1` is set so tools keep their colors in a pipe.
+`dev: { root?, processes: [{ name, command, root?, environment?, optional? }] }`. Every process starts at once with an argv `command`, run in `dev.root` (or the process `root` inside it), and its output is printed line by line with a colored `[name]` prefix. `environment` accepts the same `{env}` / `{root}` placeholders as other environment mappings, and `FORCE_COLOR=1` is set so tools keep their colors in a pipe.
 
 The first process to end ends the session: the others receive SIGTERM and the result is the first process's result. Ctrl+C is a normal stop and exits 0. Dry-run lists the processes without starting them. Names must be unique. Add `--env` to select the value of `{env}`.
+
+An entry with `optional: true` is skipped unless `--with name[,name]` names it; an unknown or non-optional name is an error.
+
+`rds dev tabs` opens each selected process in its own terminal tab and returns instead of supervising them: `{env}`/`{root}` substitution, working directories, environment values and `--with` work as for `dev start`. Each tab runs a shell line built from the argv (every argument quoted individually) and keeps the shell open when the process ends. Windows needs Windows Terminal (`wt`) and uses Git Bash when installed, otherwise PowerShell; macOS drives Terminal.app (it needs automation permission); Linux uses the first of gnome-terminal, konsole, xfce4-terminal (tabs), then x-terminal-emulator or xterm (one window per process). The launched processes are not stopped by rds. Dry-run plans the launch without opening anything.
 
 ### Waiting for a service
 
@@ -213,6 +226,14 @@ export const outputs = (env, config) => [{ path: `.env.${env}`, content: `API_UR
 `prisma: { root?, envFile, variable? }`. The database URL is read from `variable` (default `DATABASE_URL`) in `envFile`, a dotenv path relative to the config root where `{env}` becomes the environment. Generate that file first, for example with `rds env generate`. `migrate` runs `prisma migrate deploy` and `status` runs `prisma migrate status` from `root`, using the project's own `prisma` package. The URL is handed to Prisma through its environment, never logged; the host is shown.
 
 `migrate` is a mutation guard: a protected environment needs `--allow-production` and passes the production verification hooks. It then needs the database host as confirmation, either typed at the prompt or given as `--confirm-host`; without a terminal the flag is required. A host that does not match stops the command before Prisma starts. Local development databases keep using your own `prisma migrate dev` script. Dry-run plans without reading anything beyond the environment file.
+
+### PlatformIO
+
+`rds platformio -- <pio arguments>`
+
+`platformio: { root?, coreDir? }`. Runs the PlatformIO CLI from `root` (default: the config root) with exactly the arguments after `--`, for example `rds platformio -- run -e esp32` or `rds platformio -- pkg exec -p tool-esptoolpy -- esptool chip-id`. The executable is `PLATFORMIO_CMD` when set (an unusable value fails; it is never replaced by another installation), otherwise `pio` or `platformio` on PATH, the official installer's `~/.platformio/penv`, `~/.local/bin`, and on Windows the user Python Scripts folders. `coreDir` (absolute, or relative to the config root) is exported as `PLATFORMIO_CORE_DIR` unless it is already set, which is how a project keeps the toolchain cache outside the default location.
+
+The tool's standard output is passed through unchanged so callers can parse it (for example JSON from `espefuse`); rds reports its own step line on standard error for this command, and result banners also go to standard error. The exit status is the tool's. The command has no environment, production guard or hooks: it is a launcher, and projects that flash or sign devices put their policy in the script that calls it. Dry-run plans without requiring PlatformIO to be installed.
 
 ## Hosting resources and API-token deployments
 

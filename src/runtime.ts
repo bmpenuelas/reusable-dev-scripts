@@ -76,6 +76,11 @@ export const runProcess: Runner = async (invocation) => {
   let [command, args] = resolveExecutable(invocation.command, invocation.args, invocation.cwd, invocation.env)
   const batch = platform() === 'win32' && /\.(bat|cmd)$/iu.test(command)
   if (batch) [command, args] = batchInvocation(command, args)
+  if (invocation.detached) return new Promise<Result>((resolveResult, reject) => {
+    const child = spawn(command, args, { cwd: invocation.cwd, env: invocation.env ?? process.env, shell: false, detached: true, stdio: 'ignore', windowsHide: invocation.windowsHide ?? false, windowsVerbatimArguments: batch })
+    child.once('error', () => reject(new Failure(`Cannot start ${invocation.label ?? 'command'}; check tool installation`)))
+    child.once('spawn', () => { child.unref(); resolveResult({ stdout: '', stderr: '' }) })
+  })
   return new Promise<Result>((resolveResult, reject) => {
     const piped = invocation.capture || invocation.prefix !== undefined
     const child = spawn(command, args, { cwd: invocation.cwd, env: invocation.env ?? process.env, shell: false, windowsHide: invocation.windowsHide ?? true, windowsVerbatimArguments: batch, stdio: [invocation.input === undefined ? 'inherit' : 'pipe', piped ? 'pipe' : 'inherit', piped ? 'pipe' : 'inherit'] })

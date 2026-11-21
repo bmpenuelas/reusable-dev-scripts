@@ -2,7 +2,7 @@
 
 ## Cloudflare Pages
 
-`rds cloudflare setup-pages --target web --env staging --yes` idempotently creates a Direct Upload project with production branch `main` and adds the configured custom domains. An existing Git-integrated project or another production branch fails rather than being changed. Custom-domain DNS records and certificate activation remain separate; adding the Pages domain is not proof it is live. `deploy-pages` continues to use the consumer's installed Wrangler and the selected branch; existing deployment workflows are preserved.
+`rds cloudflare setup-pages --target web --env staging --yes` idempotently creates a Direct Upload project with production branch `main` and adds the configured custom domains. An existing Git-integrated project or another production branch fails rather than being changed. Custom-domain DNS records and certificate activation remain separate unless the target sets `zoneId`: then `setup-pages` also keeps a proxied CNAME from every configured domain to `<projectName>.pages.dev` (created, or made proxied; a record that points anywhere else is never re-pointed and fails the command), and `wwwRedirect: true` with exactly one apex domain adds a proxied `www` CNAME plus a Single Redirect rule (`redirectRef` names the rule, so an existing one can be adopted) that sends www to the apex with a 301, keeping path and query. The API token then also needs DNS Edit and Single Redirect (Rulesets) permissions on that zone. Certificate activation can still take a while; adding the Pages domain is not proof it is live. `deploy-pages` continues to use the consumer's installed Wrangler and the selected branch; existing deployment workflows are preserved.
 
 ```js
 import { defineConfig } from 'reusable-dev-scripts'

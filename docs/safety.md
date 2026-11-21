@@ -14,14 +14,16 @@
 | Store commands | `check` is local; `doctor` and `verify` read remote account state (`verify` aborts its Play edit and changes nothing); listing/build uploads and pull perform their documented remote/local effects |
 | VS Code publish | Publishes to the requested registries, defaulting to both |
 | Electron notarize | Submits an artifact to a remote service, then may staple it |
-| Cloudflare commands | Deploy code/files or change allowlisted Worker secrets |
+| Cloudflare commands | Deploy code/files or change allowlisted Worker secrets; `push-secrets` parses its file strictly, runs the project's `secretsModule` rules, and only then prepares and uploads |
 | Hostinger and Cloudflare Pages setup | `setup-pages`/`hostinger setup` create or change provider resources and need `--yes`; `deploy` uploads the built files |
 | `hosting reset`, `drop`, `recreate` | Permanently delete the configured website, database, cron jobs and (unless `--keep-pages`) the Pages project. Only unprotected environments and exact `--confirm-host`/`--confirm-project` values are accepted; `--dry-run` and `--check` change nothing |
 | `wait tcp` | Opens TCP connections to the configured endpoint; it changes nothing |
 | Swift bundle | Writes and signs an app bundle, ad-hoc unless an identity is configured |
 | `dev start` | Runs the configured processes until one exits; it cannot stop what a process spawns on its own |
+| `dev tabs` | Opens terminal windows that run the configured processes with your permissions; the processes outlive the command and are not stopped by it |
 | `env generate` | Writes the files the project module returns, including secrets; keep them ignored by Git |
 | `prisma migrate` | Changes the schema of the database named by the generated environment file; protected environments need `--allow-production` and the typed or `--confirm-host` host |
+| `platformio` | Runs whatever PlatformIO subcommand you pass after `--` (builds, uploads, erase, `pkg exec` tools) with your permissions and the real device attached; rds does not restrict or guard it, so flashing policy belongs in the calling script |
 | `exec` and project hooks | Run exactly the requested tool/argv; they are not restricted to the other modules' effects |
 
 ## Protected environments

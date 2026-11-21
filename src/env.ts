@@ -6,35 +6,11 @@ import { pathToFileURL } from 'node:url'
 import { requireValue, writeChanged } from './runtime.js'
 import type { Context } from './context.js'
 import type { EnvModule } from './types.js'
+import { isObject, mergeDefaults, parseJson5 } from './json5.js'
 
 type Json = Record<string, unknown>
-const isObject = (value: unknown): value is Json => value !== null && typeof value === 'object' && !Array.isArray(value)
+export { parseJson5, mergeDefaults }
 
-/** JSON with line comments, block comments and trailing commas: the editable per-environment file format. */
-export function parseJson5(text: string): unknown {
-  let out = '', inString = false
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]!
-    if (inString) {
-      out += c
-      if (c === '\\') out += text[++i] ?? ''
-      else if (c === '"') inString = false
-    } else if (c === '"') { inString = true; out += c }
-    else if (c === '/' && text[i + 1] === '/') { while (i < text.length && text[i] !== '\n') i++; out += '\n' }
-    else if (c === '/' && text[i + 1] === '*') { i += 2; while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++; i++ }
-    else out += c
-  }
-  return JSON.parse(out.replace(/,(\s*[}\]])/gu, '$1'))
-}
-/** Deep-merges `fallback` into `current`; existing values always win and `undefined` defaults are dropped. */
-export function mergeDefaults(current: unknown, fallback: unknown): unknown {
-  if (fallback === undefined) return current
-  if (current === undefined) return fallback
-  if (!isObject(fallback) || !isObject(current)) return current
-  const result: Json = { ...current }
-  for (const [key, value] of Object.entries(fallback)) { const merged = mergeDefaults(current[key], value); if (merged !== undefined) result[key] = merged }
-  return result
-}
 /** A random URL-safe secret for generated defaults. */
 export function randomSecret(bytes = 48): string { return randomBytes(bytes).toString('base64url') }
 /** Dotted paths of every value still `null`, the marker for "a human must fill this in". */
