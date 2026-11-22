@@ -2,6 +2,11 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
+## Unreleased
+
+- Added the top-level `buildSettings` section: `NAME=value` settings per platform and build kind. iOS kinds are `all`, `release` and `testflight-only` (Xcode build settings appended to the archive, so a project can compile in diagnostics that must not ship while a normal TestFlight or App Store build stays the exact release binary). Android kinds are `all`, `debug`, `release` and any project-defined name selected with the new `android build --kind <name>` (Gradle project properties `-PNAME=value`). Off unless configured; signing, version and build-configuration settings are rejected when the configuration loads. Tested through the dry-run plan and the Fastfile source; not run against a real Xcode archive or Gradle build.
+- Added `store upload-build --platform ios --testflight-only` (lane option `testflight_only:true` on `store run -- ios internal`): the build is exported with Xcode's internal-testing-only option so it cannot be selected for an App Store release or external testing. Off by default, so existing uploads still produce builds that are eligible for release. Verified against the shared Fastfile and lane validation only; not run against a real App Store Connect account.
+
 ## 0.7.0
 
 - `cloudflare push-secrets` now reads NAME=value files strictly (new `parseSecretEnv`, also exported as `reusable-dev-scripts/secret-env`): malformed lines, duplicate names and unterminated quoted values are errors instead of being skipped or silently overridden. Names must be upper-case (`[A-Z][A-Z0-9_]*`, the same rule as the allowlist) and an `export ` prefix is rejected. Comments follow Node's dotenv parser (an unquoted value ends at the first `#`; a `#` comment may follow a closing quote). **Behavior change** for projects whose upload file relied on the old forgiving reading.

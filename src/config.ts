@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { requireValue } from './runtime.js'
+import { validateBuildSettings } from './build-settings.js'
 import type { Config, Command } from './types.js'
 
 export function defineConfig(config: Config): Config { return validateConfig(config) }
@@ -10,7 +11,7 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'platformio', 'hostinger', 'defaultEnvironment']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'platformio', 'buildSettings', 'hostinger', 'defaultEnvironment']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
     if (key !== 'version' && key !== 'defaultEnvironment') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
@@ -24,7 +25,7 @@ export function validateConfig(value: unknown): Config {
     electron: ['root', 'url', 'start', 'assets', 'output', 'builderConfig', 'notaryProfile', 'prepare'],
     swift: ['root', 'executable', 'plist', 'resources', 'entitlements', 'output', 'identity', 'icon', 'iconOutput'],
     vscode: ['root', 'prepare', 'noDependencies', 'output'], cloudflare: ['targets', 'credentialsFile'], hostinger: ['targets', 'credentialsFile'], browser: ['root', 'directory', 'output', 'prepare'],
-    dev: ['root', 'processes'], wait: ['targets'], env: ['directory', 'module', 'environments', 'autoCreate', 'hints'], prisma: ['root', 'envFile', 'variable'], platformio: ['root', 'coreDir']
+    dev: ['root', 'processes'], wait: ['targets'], env: ['directory', 'module', 'environments', 'autoCreate', 'hints'], prisma: ['root', 'envFile', 'variable'], platformio: ['root', 'coreDir'], buildSettings: ['android', 'ios']
   }
   if (data.defaultEnvironment !== undefined) requireValue(typeof data.defaultEnvironment === 'string' && /^[a-zA-Z][\w-]*$/u.test(data.defaultEnvironment), 'defaultEnvironment must be an environment name')
   const keys = (entry: unknown, allowed: string[], label: string) => {
@@ -55,6 +56,7 @@ export function validateConfig(value: unknown): Config {
     }
   }
   keys(config.store?.hooks, ['beforeUpload', 'afterBuildUpload'], 'store.hooks')
+  validateBuildSettings(config.buildSettings)
   keys(config.store?.iosDevices, ['iphone', 'ipad', 'watch'], 'store.iosDevices')
   if (config.production?.environments) requireValue(Array.isArray(config.production.environments) && config.production.environments.length > 0 && config.production.environments.every(x => typeof x === 'string' && x.length), 'production.environments must be a non-empty string array')
   const cloudflareFields = ['kind', 'root', 'config', 'directory', 'projectName', 'accountId', 'domains', 'secretsFile', 'secretNames', 'commitDirty', 'branch', 'wranglerEnv', 'prepare', 'zoneId', 'wwwRedirect', 'redirectRef', 'd1Database', 'secretsModule']

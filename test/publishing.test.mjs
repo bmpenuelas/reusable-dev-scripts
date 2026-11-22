@@ -148,3 +148,36 @@ test('Ruby support receives application identities and never mutates Git implici
   assert.ok(!content.includes('commit_publish.call')); assert.match(content, /ENV.fetch\("RDS_IOS_ID"\)/); assert.ok(!content.includes('skip_check]'))
   assert.match(content, /RDS_IOS_PROJECT/); assert.match(content, /RDS_DEFAULT_IOS_LOCALE/); assert.match(content, /submit_for_review: false/); assert.match(content, /app_identifier: bundle_id.call/); assert.ok(content.includes('ENV.fetch(\'RDS_STORE_ROOT\').tr("\\\\", "/")'))
 })
+test('project iOS build settings are resolved per build kind and reach the Fastlane lane, which applies them to any build', async () => {
+  const base = { version: 1, store: { root: 'store', locales: ['en-US'], iosId: 'app.fixture', appleKey: 'private/apple.json' }, buildSettings: { ios: { all: ['COMMON=1'], release: ['KIND=release'], 'testflight-only': ['SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DIAGNOSTICS'] } } }
+  const settings = async (config, flags, extra = []) => { const f = await fixture(config, { 'dry-run': true, platform: 'ios', ...flags }); await store(f.ctx, 'upload-build', []); void extra; return JSON.parse(f.ctx.plan.at(-1).env.RDS_IOS_BUILD_SETTINGS) }
+  assert.deepEqual(await settings(base, {}), ['COMMON=1', 'KIND=release'], 'a normal build gets all + release only')
+  assert.deepEqual(await settings(base, { 'testflight-only': true }), ['COMMON=1', 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DIAGNOSTICS'], 'a TestFlight-only build gets all + testflight-only, never the release list')
+  assert.deepEqual(await settings({ ...base, buildSettings: undefined }, {}), [], 'nothing is configured by default')
+  assert.deepEqual(await settings({ ...base, buildSettings: undefined }, { 'testflight-only': true }), [])
+  const direct = await fixture(base, { 'dry-run': true })
+  await store(direct.ctx, 'run', ['ios', 'internal', 'testflight_only:true'])
+  assert.deepEqual(JSON.parse(direct.ctx.plan.at(-1).env.RDS_IOS_BUILD_SETTINGS), ['COMMON=1', 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DIAGNOSTICS'], 'the forwarded lane form resolves the same kind')
+  const content = await readFile(new URL('../support/store/Fastfile', import.meta.url), 'utf8')
+  assert.match(content, /JSON\.parse\(ENV\.fetch\("RDS_IOS_BUILD_SETTINGS", "\[\]"\)\)/)
+  assert.ok(!content.includes('RDS_IOS_TESTFLIGHT_ONLY_SETTINGS'))
+  assert.match(content, /value\.shellescape/)
+})
+test('an iOS build can be made TestFlight-only on request, and nothing else changes by default', async () => {
+  const f = await fixture({ version: 1, store: { root: 'store', locales: ['en-US'], androidId: 'app.fixture', playKey: 'private/play.json', iosId: 'app.fixture', appleKey: 'private/apple.json' } }, { 'dry-run': true, platform: 'ios' })
+  const lane = () => f.ctx.plan.at(-1).args.slice(f.ctx.plan.at(-1).args.indexOf('ios'))
+  await store(f.ctx, 'upload-build', []); assert.deepEqual(lane(), ['ios', 'internal', 'status:completed'], 'the default build stays eligible for a release')
+  f.ctx.flags['testflight-only'] = true
+  await store(f.ctx, 'upload-build', []); assert.deepEqual(lane(), ['ios', 'internal', 'status:completed', 'testflight_only:true'])
+  await store(f.ctx, 'run', ['ios', 'internal', 'testflight_only:true']); assert.deepEqual(lane(), ['ios', 'internal', 'testflight_only:true'])
+  await store(f.ctx, 'run', ['ios', 'internal', 'testflight_only:false'])
+  await assert.rejects(store(f.ctx, 'run', ['ios', 'internal', 'testflight_only:maybe']), /testflight_only must be true or false/)
+  await assert.rejects(store(f.ctx, 'run', ['android', 'internal', 'testflight_only:true']), /only to the iOS internal lane/)
+  await assert.rejects(store(f.ctx, 'run', ['ios', 'listing', 'testflight_only:true']), /only to the iOS internal lane/)
+  f.ctx.flags.platform = 'android'
+  await assert.rejects(store(f.ctx, 'upload-build', []), /--testflight-only applies only to --platform ios/)
+  const content = await readFile(new URL('../support/store/Fastfile', import.meta.url), 'utf8')
+  assert.match(content, /build_params\[:export_options\] = \{ testFlightInternalTestingOnly: true \} if testflight_only/)
+  assert.equal(content.match(/testFlightInternalTestingOnly/gu).length, 2, 'only in the guarded assignment and its comment')
+  assert.match(content, /testflight_only = options\[:testflight_only\]\.to_s == "true"/)
+})

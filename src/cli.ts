@@ -26,8 +26,8 @@ import type { Flags, Runner } from './types.js'
 type OptionKind = 'boolean' | 'string'
 const globalOptions: Record<string, OptionKind> = { cwd: 'string', config: 'string', env: 'string', 'dry-run': 'boolean', 'allow-production': 'boolean', banner: 'boolean', 'no-banner': 'boolean', help: 'boolean' }
 const options: Record<string, OptionKind> = Object.fromEntries([
-  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch', 'timeout', 'with', 'confirm-host', 'confirm-project', 'secrets-file', 'hostinger-target', 'pages-target', 'staple'].map(key => [key, 'string'] as const),
-  ...['open', 'skip-build', 'skip-typecheck', 'check', 'bump-build', 'https', 'skip-sync', 'clean', 'reveal', 'physical', 'replace', 'force', 'guided', 'strict', 'all-locales', 'include-changelogs', 'no-dependencies', 'unsigned', 'preflight', 'yes', 'resume', 'keep-pages'].map(key => [key, 'boolean'] as const),
+  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch', 'timeout', 'with', 'confirm-host', 'confirm-project', 'secrets-file', 'hostinger-target', 'pages-target', 'staple', 'kind'].map(key => [key, 'string'] as const),
+  ...['open', 'skip-build', 'skip-typecheck', 'check', 'bump-build', 'https', 'skip-sync', 'clean', 'reveal', 'physical', 'replace', 'force', 'guided', 'strict', 'all-locales', 'include-changelogs', 'testflight-only', 'no-dependencies', 'unsigned', 'preflight', 'yes', 'resume', 'keep-pages'].map(key => [key, 'boolean'] as const),
   ...Object.entries(globalOptions)
 ])
 export const commands: Record<string, string[]> = {
@@ -43,13 +43,13 @@ export const commands: Record<string, string[]> = {
   'capacitor assets': ['check', 'platform'],
   'capacitor locales': ['check'],
   'capacitor screenshots': ['platform', 'action', 'device', 'output', 'input', 'name', 'force', 'guided', 'skip-build', 'mode', 'skip-typecheck'],
-  'android build': ['configuration', 'format', 'clean', 'reveal'],
+  'android build': ['configuration', 'format', 'kind', 'clean', 'reveal'],
   'android start-adb': [],
   'android install': ['device', 'physical', 'artifact', 'replace'],
   'store scaffold': [], 'store check': ['platform', 'scope', 'strict', 'all-locales'],
   'store changelog': ['version-code', 'text', 'force'], 'store export': ['platform', 'output', 'format'],
   'store upload-listing': ['platform', 'only', 'include-changelogs', 'all-locales'],
-  'store upload-build': ['platform', 'track', 'status', 'groups', 'all-locales'],
+  'store upload-build': ['platform', 'track', 'status', 'groups', 'testflight-only', 'all-locales'],
   'store pull': ['platform'], 'store doctor': ['platform'], 'store verify': ['platform', 'scope', 'version-code'],'store run': [],
   'vscode package': ['output', 'no-dependencies'], 'vscode publish': ['output', 'registry', 'bump', 'no-dependencies'],
   'electron dev': [], 'electron assets': ['check'], 'electron clean': [], 'electron build': ['platform', 'arch', 'format', 'clean', 'unsigned'],

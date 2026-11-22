@@ -9,6 +9,7 @@ skip_docs
 default_platform(:android)
 
 require 'json'
+require 'shellwords'
 require File.join(ENV.fetch('RDS_STORE_SUPPORT'), 'verify.rb')
 # Forward slashes everywhere: deliver and supply find locale folders with Dir.glob, which treats the
 # backslashes of a Windows path as escapes and silently matches nothing (no text or images uploaded).
@@ -206,11 +207,16 @@ platform :ios do
   # with automatic distribution get it once App Store Connect has processed it; `groups:"A,B"`
   # adds it to those groups as well, waiting for the processing to finish.
   # "What to Test" is the English release_notes.txt (`notes:false` leaves it empty).
+  # A normal build can also be chosen for an App Store release in App Store Connect. `testflight_only:true`
+  # exports it with Xcode's "TestFlight internal testing only" option (testFlightInternalTestingOnly), which
+  # keeps that build out of App Store submissions and external testing for good.
   desc "Build the App Store .ipa and upload it to TestFlight for the internal testers"
   lane :internal do |options|
     UI.user_error!("Building the iOS app needs a Mac with Xcode") unless FastlaneCore::Helper.mac?
     require_key.call(apple_key, "App Store Connect API key")
-    ipa = build_app(
+    testflight_only = options[:testflight_only].to_s == "true"
+    UI.important("TestFlight-only build: it cannot be selected for an App Store release or external testing.") if testflight_only
+    build_params = {
       project: ENV.fetch("RDS_IOS_PROJECT"),
       scheme: ENV.fetch("RDS_IOS_SCHEME", "App"),
       configuration: "Release",
@@ -222,7 +228,17 @@ platform :ios do
       # widget and the watch app, using the Apple ID signed in under Xcode > Settings > Accounts.
       xcargs: "-allowProvisioningUpdates",
       export_xcargs: "-allowProvisioningUpdates"
-    )
+    }
+    build_params[:export_options] = { testFlightInternalTestingOnly: true } if testflight_only
+    # Xcode build settings the project configured for this kind of build (buildSettings.ios), already
+    # resolved by rds: `all` plus `release` or `testflight-only`. Empty unless the project asks for some.
+    extra_settings = JSON.parse(ENV.fetch("RDS_IOS_BUILD_SETTINGS", "[]"))
+    unless extra_settings.empty?
+      UI.important("Extra build settings: #{extra_settings.join(' ')}")
+      escaped = extra_settings.map { |entry| name, value = entry.split("=", 2); "#{name}=#{value.shellescape}" }
+      build_params[:xcargs] = "#{build_params[:xcargs]} #{escaped.join(' ')}"
+    end
+    ipa = build_app(**build_params)
     groups = options[:groups].to_s.split(",").map(&:strip).reject(&:empty?)
     params = {
       api_key_path: apple_key,

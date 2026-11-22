@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { createStoreMetadata } from '../support/store/metadata.mjs'
 import { artifacts, androidMapping } from './android.js'
 import { nativeVersion } from './versions.js'
+import { resolveBuildSettings } from './build-settings.js'
 import { inside, outputPath, requireValue, writeChanged } from './runtime.js'
 import type { Context } from './context.js'
 
@@ -83,11 +84,13 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     else {
       const lanes = forwarded[0] === 'android' ? ['listing', 'images', 'listing_with_images', 'internal', 'pull', 'doctor', 'verify'] : ['listing', 'screenshots', 'previews', 'listing_with_images', 'internal', 'pull', 'doctor', 'verify']
       requireValue(['android', 'ios'].includes(forwarded[0]!) && lanes.includes(forwarded[1]!), 'Unsupported shared Fastlane lane')
-      for (const option of forwarded.slice(2)) requireValue(/^(track|version|version_code|status|groups|notes|age_rating|changelogs|validate|confirm|scope|commit):[^\r\n]+$/u.test(option), 'Unsupported Fastlane option; checks and Git safety cannot be bypassed')
+      for (const option of forwarded.slice(2)) requireValue(/^(track|version|version_code|status|groups|notes|age_rating|changelogs|validate|confirm|scope|commit|testflight_only):[^\r\n]+$/u.test(option), 'Unsupported Fastlane option; checks and Git safety cannot be bypassed')
       // Play releases are either a draft or rolled out completely to the internal track; partial rollouts and halts are not offered.
       for (const option of forwarded.slice(2)) requireValue(!option.startsWith('status:') || ['status:draft', 'status:completed'].includes(option), 'status must be draft or completed')
       requireValue(!forwarded.slice(2).some(x => x.startsWith('commit:')) || forwarded.slice(2).includes('commit:false') || forwarded.slice(2).includes('commit:true'), 'commit must be true or false')
       requireValue(forwarded[1] === 'verify' || !forwarded.slice(2).some(x => x.startsWith('scope:')), 'Only the verify lane takes scope')
+      requireValue(forwarded.slice(2).filter(x => x.startsWith('testflight_only:')).every(x => x === 'testflight_only:true' || x === 'testflight_only:false'), 'testflight_only must be true or false')
+      requireValue(!forwarded.slice(2).some(x => x.startsWith('testflight_only:')) || (forwarded[0] === 'ios' && forwarded[1] === 'internal'), 'testflight_only applies only to the iOS internal lane')
       requireValue(!(forwarded[0] === 'ios' && forwarded[1] === 'internal' && forwarded.slice(2).some(x => x.startsWith('validate:'))), 'TestFlight has no validation-only upload; use --dry-run')
       uploading = !['pull', 'doctor', 'verify'].includes(forwarded[1]!)
       scope = forwarded[1] === 'listing' ? 'text' : ['images', 'screenshots', 'previews'].includes(forwarded[1]!) ? 'media' : 'all'
@@ -120,6 +123,8 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
       requireValue(platform !== 'ios' || process.platform === 'darwin' || ctx.dryRun, 'Building a TestFlight IPA requires macOS/Xcode')
       args = [platform, 'internal', `status:${ctx.choice('status', ['draft', 'completed'], 'completed')}`]
       if (ctx.flags.groups) args.push(`groups:${ctx.string('groups')}`)
+      // Opt in: the build is exported for internal TestFlight testing only, so it can never be chosen for an App Store release.
+      if (ctx.boolean('testflight-only')) { requireValue(platform === 'ios', '--testflight-only applies only to --platform ios'); args.push('testflight_only:true') }
       uploading = true
     } else args = [platform, action]
   }
@@ -140,6 +145,8 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     RDS_STORE_ROOT: root, RDS_STORE_SUPPORT: support, RDS_PROJECT_ROOT: ctx.root, RDS_CLI_ENTRY: cli, RDS_NODE: process.execPath,
     RDS_CHECK_ARGS: JSON.stringify(['--cwd', ctx.root, ...(ctx.flags.config ? ['--config', ctx.path(ctx.string('config'))] : [])]),
     RDS_IOS_ID: config.iosId, RDS_IOS_SCHEME: config.iosScheme ?? 'App',
+    // Project-chosen Xcode settings for this kind of build: the `all` list, then `testflight-only` or `release`.
+    RDS_IOS_BUILD_SETTINGS: JSON.stringify(resolveBuildSettings(ctx.config, 'ios', [args.includes('testflight_only:true') ? 'testflight-only' : 'release'])),
     RDS_DEFAULT_IOS_LOCALE: config.defaultLocales?.ios ?? config.defaultLocale ?? settings.locales[0]!.apple,
     RDS_IOS_PROJECT: ctx.path(config.iosProject ?? join(ctx.config.capacitor?.root ?? '.', 'ios/App/App.xcodeproj')),
     RDS_ANDROID_AAB: artifacts(ctx, 'release', 'aab'), RDS_ANDROID_MAPPING: androidMapping(ctx),
@@ -160,3 +167,4 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
   // Runs only once the store accepted a build; `commit:false` and a validation-only run opt out. rds itself never touches Git.
   if (args[1] === 'internal' && !args.includes('commit:false') && !args.includes('validate:true')) await ctx.hooks(config.hooks?.afterBuildUpload, ctx.root, chosen)
 }
+

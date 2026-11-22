@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join, delimiter } from 'node:path'
 import { inside, requireValue } from './runtime.js'
+import { requireAndroidKind, resolveBuildSettings } from './build-settings.js'
 import type { Context } from './context.js'
 
 export function androidEnvironment(ctx: Context): NodeJS.ProcessEnv {
@@ -33,7 +34,12 @@ export async function androidBuild(ctx: Context, tasks: string[] = [], debug = f
   requireValue(ctx.dryRun || existsSync(join(root, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew')), 'Gradle wrapper not found in configured Android root')
   const module = ctx.config.android?.module ?? 'app'; requireValue(/^[\w-]+$/u.test(module), 'Invalid Android module')
   const suffix = configuration === 'debug' ? 'Debug' : 'Release'
-  const args = [...(ctx.boolean('clean') ? ['clean'] : []), ...(tasks.length ? tasks : [`:${module}:${format === 'apk' ? 'assemble' : 'bundle'}${suffix}`])]
+  // Project-chosen Gradle properties (buildSettings.android): `all`, then this configuration, then the optional custom --kind.
+  const kind = ctx.string('kind')
+  if (kind) requireAndroidKind(ctx.config, kind)
+  const properties = resolveBuildSettings(ctx.config, 'android', [configuration, ...(kind ? [kind] : [])]).map(entry => `-P${entry}`)
+  if (properties.length) ctx.log(`${ctx.dryRun ? '[plan]' : '[rds]'} Gradle properties: ${properties.join(' ')}`)
+  const args = [...(ctx.boolean('clean') ? ['clean'] : []), ...properties, ...(tasks.length ? tasks : [`:${module}:${format === 'apk' ? 'assemble' : 'bundle'}${suffix}`])]
   await ctx.run(process.platform === 'win32' ? join(root, 'gradlew.bat') : './gradlew', args, { cwd: root, env: androidEnvironment(ctx), label: 'Android Gradle build' })
   const artifact = artifacts(ctx, configuration, format)
   if (!tasks.length) {
