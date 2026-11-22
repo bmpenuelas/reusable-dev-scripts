@@ -21,12 +21,13 @@ import { waitTcp } from './wait.js'
 import { env } from './env.js'
 import { prisma } from './prisma.js'
 import { platformio } from './platformio.js'
+import { media } from './media.js'
 import type { Flags, Runner } from './types.js'
 
 type OptionKind = 'boolean' | 'string'
 const globalOptions: Record<string, OptionKind> = { cwd: 'string', config: 'string', env: 'string', 'dry-run': 'boolean', 'allow-production': 'boolean', banner: 'boolean', 'no-banner': 'boolean', help: 'boolean' }
 const options: Record<string, OptionKind> = Object.fromEntries([
-  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch', 'timeout', 'with', 'confirm-host', 'confirm-project', 'secrets-file', 'hostinger-target', 'pages-target', 'staple', 'kind'].map(key => [key, 'string'] as const),
+  ...['platform', 'mode', 'bump', 'host', 'port', 'configuration', 'format', 'device', 'artifact', 'action', 'output', 'input', 'name', 'scope', 'version-code', 'text', 'only', 'track', 'status', 'groups', 'registry', 'arch', 'profile', 'target', 'branch', 'timeout', 'with', 'confirm-host', 'confirm-project', 'secrets-file', 'assets', 'locales', 'scenes', 'hostinger-target', 'pages-target', 'staple', 'kind'].map(key => [key, 'string'] as const),
   ...['open', 'skip-build', 'skip-typecheck', 'check', 'bump-build', 'https', 'skip-sync', 'clean', 'reveal', 'physical', 'replace', 'force', 'guided', 'strict', 'all-locales', 'include-changelogs', 'testflight-only', 'no-dependencies', 'unsigned', 'preflight', 'yes', 'resume', 'keep-pages'].map(key => [key, 'boolean'] as const),
   ...Object.entries(globalOptions)
 ])
@@ -64,7 +65,10 @@ export const commands: Record<string, string[]> = {
   'browser package': ['output'],
   'dev start': ['with'], 'dev tabs': ['with'], 'wait tcp': ['target', 'timeout'],
   'env template': [], 'env validate': [], 'env generate': [], 'env check': [],
-  'prisma migrate': ['confirm-host'], 'prisma status': []
+  'prisma migrate': ['confirm-host'], 'prisma status': [],
+  'media list': ['platform', 'assets'], 'media scaffold': ['platform', 'assets', 'force'], 'media capture': ['locales', 'scenes'],
+  'media render': ['platform', 'assets', 'locales', 'force', 'check'], 'media check': ['platform', 'assets', 'locales', 'strict', 'all-locales'],
+  'media sheet': ['platform', 'assets', 'locales'], 'media view': ['port', 'locales']
 }
 const passthroughCommands = ['exec', 'platformio', 'vue build', 'android build', 'store run']
 export function parse(argv: string[]) {
@@ -89,7 +93,7 @@ export function parse(argv: string[]) {
 }
 export function help(key = ''): string {
   if (key.startsWith('hosting ') && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${key === 'hosting reset' ? 'Permanently delete and recreate' : key === 'hosting drop' ? 'Permanently delete (the database is always discarded)' : 'Continue the drop journal and recreate'} the exact hosted resources. Protected environments are forbidden. Temporary domains change automatically. Consumer deployment remains separate.\n`
-  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${passthroughCommands.includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}${key === 'android build' ? '--reveal is best-effort; file-manager failure only warns after a verified build.\n' : ''}${key === 'android install' ? 'android.appId must match the APK application ID, including any debug suffix. --replace deletes only that configured package and its data.\n' : ''}${key === 'electron notarize' ? 'A ZIP cannot be stapled: --staple names the .app inside it. --artifact/--staple may use * in the last path segment if it matches exactly one item. Profile: --profile, APPLE_NOTARY_PROFILE, then electron.notaryProfile.\n' : ''}${key === 'store upload-build' ? 'store.hooks.afterBuildUpload runs only after the store accepted the build.\n' : ''}`
+  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${passthroughCommands.includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}${['capacitor versions', 'capacitor prepare', 'vscode publish'].includes(key) ? '--bump updates the owning package and its existing npm workspace lockfile entry without running npm lifecycle scripts or changing Git.\n' : ''}${key === 'android build' ? '--reveal is best-effort; file-manager failure only warns after a verified build.\n' : ''}${key === 'android install' ? 'android.appId must match the APK application ID, including any debug suffix. --replace deletes only that configured package and its data.\n' : ''}${key === 'electron notarize' ? 'A ZIP cannot be stapled: --staple names the .app inside it. --artifact/--staple may use * in the last path segment if it matches exactly one item. Profile: --profile, APPLE_NOTARY_PROFILE, then electron.notaryProfile.\n' : ''}${key === 'store upload-build' ? 'store.hooks.afterBuildUpload runs only after the store accepted the build.\n' : ''}`
   return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production --banner --no-banner\nResult banners default to on; configure output.banners or RDS_BANNERS=0|1.\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
 }
 export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log, onContext?: (ctx: Context) => void): Promise<Context | undefined> {
@@ -138,6 +142,7 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
     case 'wait': await waitTcp(ctx); break
     case 'env': await env(ctx, action!); break
     case 'prisma': await prisma(ctx, action!); break
+    case 'media': await media(ctx, action!); break
     case 'platformio':
       // The tool's stdout is often parsed by the caller, so the step line goes to stderr unless the caller supplied a logger.
       if (log === console.log) ctx.log = message => console.error(message)

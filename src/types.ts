@@ -14,7 +14,7 @@ export interface Config {
   output?: { banners?: boolean };
   production?: { environments?: string[]; verify?: Command[] };
   vue?: { root?: string; typecheck?: 'build' | 'noEmit' | false; modes?: Record<string, string> };
-  capacitor?: Hooks & { root?: string; packageJson?: string; platforms?: ('android' | 'ios')[]; androidProject?: string; iosProject?: string; assets?: Images & { native?: boolean }; locales?: NativeLocales; live?: { host?: string; port?: number; https?: boolean; ca?: string; timeout?: number }; screenshots?: { output?: string; sizes?: { width: number; height: number }[] }; /** More Gradle modules (for example a Wear OS app) that share the package version. `project` is the module's build.gradle relative to the Capacitor root; `versionCodeOffset` is added to the native build number so each form factor gets its own version code. */ androidModules?: { project: string; versionCodeOffset?: number }[] };
+  capacitor?: Hooks & { root?: string; /** Config-root-relative version source. With --bump it must be the owning package.json. */ packageJson?: string; platforms?: ('android' | 'ios')[]; androidProject?: string; iosProject?: string; assets?: Images & { native?: boolean }; locales?: NativeLocales; live?: { host?: string; port?: number; https?: boolean; ca?: string; timeout?: number }; screenshots?: { output?: string; sizes?: { width: number; height: number }[] }; /** More Gradle modules (for example a Wear OS app) that share the package version. `project` is the module's build.gradle relative to the Capacitor root; `versionCodeOffset` is added to the native build number so each form factor gets its own version code. */ androidModules?: { project: string; versionCodeOffset?: number }[] };
   /** Extra build settings (`NAME=value`) per platform and build kind. iOS: Xcode build settings for `release` and `testflight-only` builds. Android: Gradle project properties (`-PNAME=value`) for `debug` and `release` builds and for custom kinds selected with `android build --kind`. `all` applies to every build of the platform. Signing, version and build-configuration settings are rejected. */
   buildSettings?: { android?: Record<string, string[]>; ios?: Partial<Record<'all' | 'release' | 'testflight-only', string[]>> };
   android?: { root?: string; appId?: string; module?: string; apk?: string; aab?: string; mapping?: string; javaHome?: string; sdkRoot?: string };
@@ -31,6 +31,57 @@ export interface Config {
   prisma?: { root?: string; envFile: string; variable?: string };
   /** `root` is the directory with platformio.ini. `coreDir` becomes PLATFORMIO_CORE_DIR unless the environment already sets it (absolute, or relative to the config root). */
   platformio?: { root?: string; coreDir?: string };
+  media?: MediaConfig;
+}
+export type MediaPlatform = 'android' | 'ios' | 'mac' | 'windows'
+/** One captured app scene. The project's capture module decides how the page reaches it. */
+export interface MediaScene { id: string; viewport: { width: number; height: number }; deviceScaleFactor?: number; colorScheme?: 'light' | 'dark'; /** Keep the page background transparent in the PNG. */ transparent?: boolean }
+/** A store image rds has no built-in definition for (a site link preview, a promo banner, another store). */
+export interface MediaCustomAsset { id: string; platform: string; label?: string; width: number; height: number; format?: 'png' | 'jpeg'; alpha?: 'forbid' | 'keep'; maxBytes?: number; /** Minimum and maximum number of images in the set (default 1 and 1). */ min?: number; max?: number; required?: boolean; localized?: boolean; source?: 'design' | 'capture'; /** Folder below the export root; `{locale}` is the app language code. Default `artwork/<platform>/{locale}`. */ directory?: string; /** File name without extension; sets get a two-digit number appended. Default the id's last segment. */ name?: string }
+/**
+ * Store media: empty base designs, a live viewer with store mocks, and the commands that render every final image from them.
+ * Everything lives below `root`: `base/` (designs), `shared/` (kit, fonts), `copy/<lang>.json` (words), `captures/<lang>/` (app screens), `review/` (contact sheets).
+ */
+export interface MediaConfig {
+  root?: string
+  /** Which store catalogs apply. Default android and ios. */
+  platforms?: MediaPlatform[]
+  /** Only these asset ids (default: every asset of the selected platforms, plus custom ones), and ids to leave out. */
+  assets?: string[]; exclude?: string[]
+  /** Languages: app code, or { app, android, ios } store folder names. Default `store.locales`. */
+  locales?: (string | { app: string; android: string; ios: string })[]
+  /** App code of the default language: the only one that must have every image, and the fallback for copy and captures. Default the first locale. */
+  defaultLocale?: string
+  /** Asset id -> design path below `root`: an `.html` page rendered by a browser, or a `.png`/`.svg`/`.jpg`/`.webp` master resized by sharp. Default `base/<id>.html`. */
+  designs?: Record<string, string>
+  /** Asset id -> one of the sizes the store accepts for it, when not the catalog's default. */
+  sizes?: Record<string, [number, number]>
+  /** Asset id -> scene ids, for assets built straight from captures (Microsoft Store screenshots, or any asset whose source is capture). */
+  scenes?: Record<string, string[]>
+  /** Asset id -> where its images come from (`capture` = copied from captures with no artwork). Must be one the catalog allows. */
+  sources?: Record<string, 'design' | 'capture'>
+  custom?: MediaCustomAsset[]
+  /** Colour that replaces transparency where a store forbids it. Default #ffffff. */
+  background?: string
+  /** Fixed browser clock (ISO date) so dates and times in designs render the same every time. */
+  clock?: string
+  /** Block every request that is not to the local media server (deterministic renders, no web fonts from the network). */
+  offline?: boolean
+  /** Designs rendered at the same time. Default 2. */
+  jobs?: number
+  /** Extra project directories the media server may serve, besides `root` (for example the app's own artwork). Relative to the config root. */
+  serve?: string[]
+  /** Hook-driven capture of real app screens, see MediaCaptureModule. */
+  capture?: { module: string; baseUrl: string; scenes: MediaScene[]; /** Allow a non-local baseUrl. */ allowRemote?: boolean }
+  viewer?: { port?: number }
+  hooks?: { beforeRender?: Command[]; afterRender?: Command[] }
+}
+/** Contract of `media.capture.module`: project code that prepares and drives the page for each scene and language. */
+export interface MediaCaptureModule {
+  /** Optional: runs once per language before any page opens (route mocks, storage, init scripts). */
+  prepare?(input: { context: unknown; locale: string; baseUrl: string }): void | Promise<void>
+  /** Opens the scene in `page` and returns when it is ready to be photographed. */
+  scene(input: { page: unknown; scene: MediaScene; locale: string; baseUrl: string }): void | Promise<void>
 }
 /** One long-running process started by `dev start`. `root` is relative to `dev.root`. */
 export interface DevProcess { name: string; command: Command; root?: string; environment?: Record<string, string>; /** Only started when named in `--with`. */ optional?: boolean }

@@ -1,0 +1,104 @@
+/*
+ * rds media device frames, served at /_rds/devices.css by `rds media view` and `rds media render`.
+ *
+ *   <link rel="stylesheet" href="/_rds/devices.css">
+ *   <div class="rds-device" data-device="iphone" style="--device-width: 900px">
+ *     <img class="rds-screen" src="../captures/en/phone-home.png" alt="">
+ *   </div>
+ *
+ * data-device: iphone (Dynamic Island), android (punch-hole camera), tablet, watch (rounded square, crown), watch-round.
+ * --device-width sets the outer width; everything else scales with it. The screen keeps the aspect ratio of what it holds (an
+ * <img class="rds-screen"> or any element with that class and an aspect-ratio). Optional:
+ *   <span class="rds-status" data-time="9:41"></span> after the screen draws a status bar with that time and the usual icons
+ *   data-status-tone="dark"   on the device: white status bar text, for dark screens
+ *   --device-color            the frame colour (default near-black), --device-edge the rim highlight
+ *   --device-shadow           the drop shadow (default a soft one; none to remove)
+ * Frames are pure CSS, need no network and work offline.
+ */
+.rds-device {
+  --device-width: 1000px;
+  --device-color: #121417;
+  --device-edge: #3a3f46;
+  --device-shadow: 0 calc(var(--device-width) * 0.05) calc(var(--device-width) * 0.12) rgba(10, 14, 20, 0.28);
+  --bezel: calc(var(--device-width) * 0.03);
+  --radius: calc(var(--device-width) * 0.145);
+  position: relative;
+  box-sizing: border-box;
+  width: var(--device-width);
+  padding: var(--bezel);
+  border-radius: var(--radius);
+  background: var(--device-color);
+  box-shadow: inset 0 0 0 calc(var(--device-width) * 0.004) var(--device-edge), var(--device-shadow);
+  line-height: 0;
+  flex: none;
+}
+.rds-device > .rds-screen {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  overflow: hidden;
+  border-radius: calc(var(--radius) - var(--bezel));
+  background: #fff;
+  object-fit: cover;
+  object-position: top center;
+}
+/* Camera cut-outs sit over the screen. */
+.rds-device::after { content: ''; position: absolute; left: 50%; z-index: 2; transform: translateX(-50%); background: #050506; }
+/* Side buttons stick out of the frame. */
+.rds-device::before { content: ''; position: absolute; z-index: -1; background: var(--device-color); box-shadow: inset 0 0 0 calc(var(--device-width) * 0.003) var(--device-edge); }
+
+.rds-device[data-device="iphone"]::after {
+  top: calc(var(--bezel) + var(--device-width) * 0.024);
+  width: calc(var(--device-width) * 0.27); height: calc(var(--device-width) * 0.08);
+  border-radius: calc(var(--device-width) * 0.04);
+}
+.rds-device[data-device="iphone"]::before,
+.rds-device[data-device="android"]::before {
+  top: 22%; right: calc(var(--device-width) * -0.009);
+  width: calc(var(--device-width) * 0.02); height: 9%;
+  border-radius: calc(var(--device-width) * 0.01);
+}
+.rds-device[data-device="android"] { --radius: calc(var(--device-width) * 0.1); --bezel: calc(var(--device-width) * 0.026); }
+.rds-device[data-device="android"]::after {
+  top: calc(var(--bezel) + var(--device-width) * 0.03);
+  width: calc(var(--device-width) * 0.038); height: calc(var(--device-width) * 0.038);
+  border-radius: 50%;
+}
+.rds-device[data-device="tablet"] { --radius: calc(var(--device-width) * 0.055); --bezel: calc(var(--device-width) * 0.028); }
+.rds-device[data-device="tablet"]::after {
+  top: calc(var(--bezel) * 0.5); transform: translate(-50%, -50%);
+  width: calc(var(--device-width) * 0.009); height: calc(var(--device-width) * 0.009);
+  border-radius: 50%; background: #23272d;
+}
+.rds-device[data-device="tablet"]::before { top: calc(var(--device-width) * -0.006); right: 12%; width: 9%; height: calc(var(--device-width) * 0.012); border-radius: calc(var(--device-width) * 0.006); }
+.rds-device[data-device="watch"] { --radius: calc(var(--device-width) * 0.2); --bezel: calc(var(--device-width) * 0.06); }
+.rds-device[data-device="watch"]::after,
+.rds-device[data-device="watch-round"]::after { display: none; }
+.rds-device[data-device="watch"]::before,
+.rds-device[data-device="watch-round"]::before {
+  top: 30%; right: calc(var(--device-width) * -0.055);
+  width: calc(var(--device-width) * 0.08); height: calc(var(--device-width) * 0.17);
+  border-radius: calc(var(--device-width) * 0.025);
+}
+.rds-device[data-device="watch-round"] { --radius: 50%; --bezel: calc(var(--device-width) * 0.08); }
+.rds-device[data-device="watch-round"] > .rds-screen { border-radius: 50%; aspect-ratio: 1; }
+
+/* Status bar: the time on the left, signal, Wi-Fi and battery on the right. */
+.rds-device > .rds-status {
+  position: absolute; z-index: 3; left: var(--bezel); right: var(--bezel); top: var(--bezel);
+  display: flex; align-items: center; justify-content: space-between; box-sizing: border-box;
+  height: calc(var(--device-width) * 0.125); padding: 0 calc(var(--device-width) * 0.09);
+  font: 600 calc(var(--device-width) * 0.04) / 1 -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, Arial, sans-serif;
+  color: #0b0d10; pointer-events: none;
+}
+.rds-device[data-device="android"] > .rds-status { height: calc(var(--device-width) * 0.1); padding: 0 calc(var(--device-width) * 0.07); }
+.rds-device[data-device="tablet"] > .rds-status { height: calc(var(--device-width) * 0.045); padding: 0 calc(var(--device-width) * 0.04); font-size: calc(var(--device-width) * 0.016); }
+.rds-device[data-status-tone="dark"] > .rds-status { color: #fff; }
+.rds-device > .rds-status::before { content: attr(data-time); }
+.rds-device > .rds-status::after {
+  content: ''; width: 4.2em; height: 1em; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 68 16'%3E%3Cpath d='M1 11h3v4H1zm5-3h3v7H6zm5-3h3v10h-3zm5-3h3v13h-3z'/%3E%3Cpath d='M32 4.5a12 12 0 0 1 8.5 3.5l1.6-1.6A14.3 14.3 0 0 0 32 2.2a14.3 14.3 0 0 0-10.1 4.2L23.5 8A12 12 0 0 1 32 4.5zm0 4.5a7.5 7.5 0 0 1 5.3 2.2l1.6-1.6a9.8 9.8 0 0 0-13.8 0l1.6 1.6A7.5 7.5 0 0 1 32 9zm0 4.4 2.4-2.4a3.4 3.4 0 0 0-4.8 0z'/%3E%3Crect x='46' y='2.5' width='18' height='11' rx='3' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3Crect x='48' y='4.5' width='14' height='7' rx='1.5'/%3E%3Cpath d='M65.5 6.5h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-1z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 68 16'%3E%3Cpath d='M1 11h3v4H1zm5-3h3v7H6zm5-3h3v10h-3zm5-3h3v13h-3z'/%3E%3Cpath d='M32 4.5a12 12 0 0 1 8.5 3.5l1.6-1.6A14.3 14.3 0 0 0 32 2.2a14.3 14.3 0 0 0-10.1 4.2L23.5 8A12 12 0 0 1 32 4.5zm0 4.5a7.5 7.5 0 0 1 5.3 2.2l1.6-1.6a9.8 9.8 0 0 0-13.8 0l1.6 1.6A7.5 7.5 0 0 1 32 9zm0 4.4 2.4-2.4a3.4 3.4 0 0 0-4.8 0z'/%3E%3Crect x='46' y='2.5' width='18' height='11' rx='3' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3Crect x='48' y='4.5' width='14' height='7' rx='1.5'/%3E%3Cpath d='M65.5 6.5h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-1z'/%3E%3C/svg%3E") center / contain no-repeat;
+}

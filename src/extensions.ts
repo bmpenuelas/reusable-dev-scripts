@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { join, dirname } from 'node:path'
+import { join } from 'node:path'
 import { archiveDirectory } from './files.js'
+import { bumpNpmVersion } from './npm-version.js'
 import { inside, outputPath, requireValue, writeChanged } from './runtime.js'
 import type { Context } from './context.js'
 
@@ -13,7 +14,7 @@ export async function vscode(ctx: Context, action: string) {
     const bump = ctx.string('bump')
     if (bump) {
       requireValue(['patch', 'minor', 'major'].includes(bump), 'Invalid extension version bump')
-      await ctx.run('npm', ['--prefix', root, '--workspaces=false', 'version', bump, '--no-git-tag-version', '--ignore-scripts'], { cwd: root, label: 'Bump extension version' })
+      await bumpNpmVersion(ctx, join(root, 'package.json'), bump, 'Bump extension version')
     }
   }
   await ctx.hooks(config.prepare, root)

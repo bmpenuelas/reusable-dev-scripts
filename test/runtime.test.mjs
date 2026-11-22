@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { mkdir, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
-import { parse, main, commands } from '../dist/cli.js'
+import { parse, main, commands, help } from '../dist/cli.js'
 import { validateConfig } from '../dist/config.js'
 import { inside, outputPath, resolveExecutable, batchInvocation, runProcess, Failure } from '../dist/runtime.js'
 import { fixture } from './helpers.mjs'
@@ -15,6 +15,7 @@ test('strict CLI parsing preserves literal passthrough and inline equals', () =>
 })
 test('all commands have help without loading consumer config', async () => {
   for (const key of Object.keys(commands)) { const lines = []; await main([...key.split(' '), '--help'], undefined, x => lines.push(x)); assert.ok(lines[0].startsWith(`rds ${key}\n`)); assert.match(lines[0], /Options:/) }
+  for (const key of ['capacitor versions', 'capacitor prepare', 'vscode publish']) assert.match(help(key), /workspace lockfile/)
   await assert.rejects(main(['vue', 'build', '--registry', 'all']), /not supported/)
   await assert.rejects(main(['capacitor', 'sync', '--', 'surprise']), /passthrough/)
 })
@@ -23,6 +24,7 @@ test('validates hook argv without interpreting translation names as hooks', () =
   assert.throws(() => validateConfig({ version: 1, unexpected: {} }), /Unknown/)
   assert.throws(() => validateConfig({ version: 1, production: { verfy: [] } }), /Unknown production field/)
   assert.throws(() => validateConfig({ version: 1, capacitor: { buildByPlatform: { andriod: ['node', 'build.mjs'] } } }), /Unknown buildByPlatform/)
+  assert.throws(() => validateConfig({ version: 1, capacitor: { packageJson: 123 } }), /packageJson must be a non-empty path/)
   assert.throws(() => validateConfig({ version: 1, vue: { typecheck: true } }), /typecheck/)
   assert.doesNotThrow(() => validateConfig({ version: 1, capacitor: { locales: { locales: { en: { prepare: 'Ready?' } }, defaultLocale: 'en', targets: [] } } }))
 })

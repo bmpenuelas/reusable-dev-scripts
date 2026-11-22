@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { requireValue, writeChanged, inside } from './runtime.js'
+import { bumpNpmVersion } from './npm-version.js'
 import type { Context } from './context.js'
 
 export function nativeVersion(raw: string) {
@@ -59,7 +60,7 @@ export async function versions(ctx: Context) {
     if (existsSync(ios)) outputs.push([ios, syncIos(await readFile(ios, 'utf8'), version, build, bumpBuild)])
   }
   requireValue(outputs.length, 'No selected native version files found')
-  if (bump) await ctx.run('npm', ['--prefix', dirname(path), '--workspaces=false', 'version', requestedVersion, '--no-git-tag-version', '--ignore-scripts'], { cwd: dirname(path), label: 'Bump package version' })
+  if (bump) await bumpNpmVersion(ctx, path, requestedVersion, 'Bump package version')
   if (!ctx.dryRun) for (const [file, content] of outputs) await writeChanged(file, content, ctx.boolean('check'))
   ctx.log(`${ctx.dryRun ? '[plan]' : '[rds]'} Native versions ${version}, base build ${build}`)
 }

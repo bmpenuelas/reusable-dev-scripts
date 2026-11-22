@@ -242,6 +242,53 @@ export default {
 
 Select a target and explicit environment when invoking a Cloudflare command. Keep account configuration, domains, header policy and secret generation local. See [Cloudflare commands](commands.md#cloudflare) and the [safety model](safety.md) before deploying.
 
+## Build settings
+
+Add `buildSettings` to compile something into one kind of build only, for example diagnostics in a build that can never be released. Entries are `NAME=value` strings per platform: Xcode build settings on iOS (kinds `all`, `release`, `testflight-only`) and Gradle project properties on Android (kinds `all`, `debug`, `release` and any name you define, selected with `android build --kind <name>`). Nothing is applied unless configured, and signing, version and build-configuration settings are rejected. See [Build settings](commands.md#build-settings).
+
+```js
+buildSettings: {
+  android: { 'internal-only': ['diagnostics=true'] },
+  ios: { 'testflight-only': ['SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DIAGNOSTICS'] },
+}
+```
+
+## Store media
+
+Add `media` next to `store` to make every store image from designs you own, and run the steps in [Store media](commands.md#store-media). `locales` default to `store.locales`, so a project that already configures its store languages only chooses what to produce:
+
+```js
+media: {
+  platforms: ['android', 'ios', 'windows'],
+  exclude: ['android.wear'],
+  sizes: { 'ios.iphone': [1284, 2778] },
+  designs: { 'android.icon': 'base/icon.svg' },
+  capture: {
+    module: 'scripts/media-capture.mjs',
+    baseUrl: 'http://localhost:5173',
+    scenes: [{ id: 'home', viewport: { width: 1920, height: 1080 } }],
+  },
+  scenes: { 'windows.screenshots': ['home'] },
+  custom: [{ id: 'web.share', platform: 'web', width: 1200, height: 630, format: 'jpeg', localized: false, directory: 'artwork/web' }],
+  clock: '2026-01-01T09:00:00Z',
+  viewer: { port: 5177 },
+}
+```
+
+The capture module is yours:
+
+```js
+export async function prepare({ context, locale, baseUrl }) {
+  await context.route('https://api.example.com/**', route => route.fulfill({ json: { demo: true } }))
+}
+export async function scene({ page, scene, locale, baseUrl }) {
+  await page.goto(`${baseUrl}/?lang=${locale}&scene=${scene.id}`)
+  await page.waitForLoadState('networkidle')
+}
+```
+
+Keep what is specific to your app (the demo data, the layout, the words) in `media.root`, the capture module and these settings; rds only knows the stores' rules and the mechanics.
+
 ## Local services, environment files and migrations
 
 A backend/frontend repository can replace its hand-written dev, wait, environment and migration scripts with four small sections. Project policy stays in the module referenced by `env.module`. See [services.config.mjs](../examples/services.config.mjs) and the [local development reference](commands.md#local-development).

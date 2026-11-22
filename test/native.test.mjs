@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { versions, nativeVersion, syncIos, syncAndroid } from '../dist/versions.js'
@@ -28,14 +29,93 @@ test('preflight all native files before bumping package version', async () => {
   const f = await fixture({ version: 1, capacitor: {} }, { bump: 'patch' }); await f.file('package.json', '{"version":"1.2.3"}'); await f.file('ios/App/App.xcodeproj/project.pbxproj', 'CURRENT_PROJECT_VERSION = invalid;')
   await assert.rejects(versions(f.ctx), /integer/); assert.equal(f.calls.length, 0)
 })
-test('bumping a workspace changes only its own package and lockfile', async () => {
-  const f = await fixture({ version: 1, capacitor: { root: 'frontend', platforms: ['android'] } }, { platform: 'android', bump: 'patch' })
-  await f.file('package.json', '{"name":"parent","version":"9.0.0","workspaces":["frontend"]}')
-  await f.file('frontend/package.json', '{"name":"child","version":"1.0.0"}'); await f.file('frontend/android/app/build.gradle', 'versionCode 1000000\nversionName "1.0.0"')
-  f.ctx.runner = runProcess; await versions(f.ctx)
-  assert.equal(JSON.parse(await readFile(join(f.root, 'package.json'), 'utf8')).version, '9.0.0')
-  assert.equal(JSON.parse(await readFile(join(f.root, 'frontend/package.json'), 'utf8')).version, '1.0.1')
-  assert.match(await readFile(join(f.root, 'frontend/android/app/build.gradle'), 'utf8'), /1000001/)
+test('bumping the configured workspace updates its entry in the shared npm lock, not the root or siblings', async () => {
+  const f = await fixture({ version: 1, capacitor: { root: 'frontend', packageJson: 'apps/mobile/package.json' } }, { platform: 'android', bump: 'patch' })
+  const rootManifest = '{"name":"parent","version":"9.0.0","workspaces":["apps/*"]}'
+  const siblingManifest = '{"name":"sibling","version":"2.0.0"}'
+  const lock = { name: 'parent', version: '9.0.0', lockfileVersion: 3, packages: {
+    '': { name: 'parent', version: '9.0.0', workspaces: ['apps/*'] },
+    'apps/mobile': { name: 'child', version: '1.0.0', dependencies: { fixture: '3.0.0' } },
+    'apps/sibling': { version: '2.0.0' },
+    'node_modules/child': { resolved: 'apps/mobile', link: true },
+    'node_modules/sibling': { resolved: 'apps/sibling', link: true },
+    'node_modules/fixture': { version: '3.0.0' }
+  } }
+  const format = value => JSON.stringify(value, null, '\t').replaceAll('\n', '\r\n') + '\r\n'
+  const rootPath = await f.file('package.json', rootManifest)
+  const siblingPath = await f.file('apps/sibling/package.json', siblingManifest)
+  const manifest = await f.file('apps/mobile/package.json', '{"name":"child","version":"1.0.0","scripts":{"version":"node -e \\"process.exit(19)\\""}}')
+  const native = await f.file('frontend/android/app/build.gradle', 'versionCode 1000000\nversionName "1.0.0"')
+  const lockPath = await f.file('package-lock.json', format(lock))
+  f.ctx.runner = runProcess
+  await versions(f.ctx)
+  assert.equal(await readFile(rootPath, 'utf8'), rootManifest)
+  assert.equal(await readFile(siblingPath, 'utf8'), siblingManifest)
+  assert.equal(JSON.parse(await readFile(manifest, 'utf8')).version, '1.0.1')
+  assert.match(await readFile(native, 'utf8'), /1000001/)
+  lock.packages['apps/mobile'].version = '1.0.1'
+  assert.equal(await readFile(lockPath, 'utf8'), format(lock))
+  assert.equal(existsSync(join(f.root, 'apps/mobile/package-lock.json')), false)
+  assert.equal(existsSync(join(f.root, 'node_modules')), false)
+  assert.deepEqual(f.ctx.plan.map(step => step.command), ['npm'])
+})
+test('standalone bumps keep updating the colocated npm lock without touching a non-member ancestor lock', async () => {
+  const f = await fixture({ version: 1, capacitor: { root: 'mobile' } }, { platform: 'android', bump: 'patch' })
+  const shared = '{"version":"9.0.0","lockfileVersion":3,"packages":{"":{"version":"9.0.0"},"apps/other":{"version":"1.0.0"}}}'
+  await f.file('package.json', '{"name":"parent","version":"9.0.0","workspaces":["apps/*"]}')
+  const sharedPath = await f.file('package-lock.json', shared)
+  await f.file('mobile/package.json', '{"name":"mobile","version":"1.0.0"}')
+  const local = await f.file('mobile/package-lock.json', '{"name":"mobile","version":"1.0.0","lockfileVersion":3,"packages":{"":{"name":"mobile","version":"1.0.0"}}}')
+  await f.file('mobile/android/app/build.gradle', 'versionCode 1000000\nversionName "1.0.0"')
+  f.ctx.runner = runProcess
+  await versions(f.ctx)
+  assert.equal(await readFile(sharedPath, 'utf8'), shared)
+  const lock = JSON.parse(await readFile(local, 'utf8'))
+  assert.equal(lock.version, '1.0.1')
+  assert.equal(lock.packages[''].version, '1.0.1')
+})
+test('a workspace bump dry-run reports the lockfile step without mutating anything', async () => {
+  const f = await fixture({ version: 1, capacitor: { root: 'mobile' } }, { platform: 'android', bump: 'patch', 'dry-run': true })
+  await f.file('package.json', '{"workspaces":["mobile"]}')
+  const manifest = await f.file('mobile/package.json', '{"version":"1.0.0"}')
+  const native = await f.file('mobile/android/app/build.gradle', 'versionCode 1000000\nversionName "1.0.0"')
+  const lock = await f.file('npm-shrinkwrap.json', '{"lockfileVersion":2,"packages":{"mobile":{"version":"1.0.0"}}}')
+  const before = await Promise.all([manifest, native, lock].map(path => readFile(path, 'utf8')))
+  await versions(f.ctx)
+  assert.equal(f.calls.length, 0)
+  assert.ok(f.messages.includes('[plan] Sync npm workspace lockfile version'))
+  assert.deepEqual(await Promise.all([manifest, native, lock].map(path => readFile(path, 'utf8'))), before)
+})
+test('a bump never searches for shared workspace locks above the config root', async () => {
+  const f = await fixture({ version: 1, capacitor: { root: 'mobile' } }, { platform: 'android', bump: 'patch' })
+  const shared = '{"lockfileVersion":3,"packages":{"apps/mobile":{"version":"1.0.0"}}}'
+  await f.file('package.json', '{"workspaces":["apps/*"]}')
+  const lock = await f.file('package-lock.json', shared)
+  const manifest = await f.file('apps/mobile/package.json', '{"name":"mobile","version":"1.0.0"}')
+  await f.file('apps/mobile/android/app/build.gradle', 'versionCode 1000000\nversionName "1.0.0"')
+  f.ctx.root = join(f.root, 'apps')
+  f.ctx.config.capacitor.packageJson = process.platform === 'win32' ? join(f.root.toUpperCase(), 'apps/mobile/package.json') : manifest
+  f.ctx.runner = runProcess
+  await versions(f.ctx)
+  assert.equal(JSON.parse(await readFile(manifest, 'utf8')).version, '1.0.1')
+  assert.equal(await readFile(lock, 'utf8'), shared)
+})
+test('a malformed shared npm lock fails preflight before a workspace bump', async () => {
+  const f = await fixture({ version: 1, capacitor: { root: 'mobile' } }, { platform: 'android', bump: 'patch' })
+  await f.file('package.json', '{"workspaces":["mobile"]}')
+  await f.file('package-lock.json', '{invalid')
+  await f.file('mobile/package.json', '{"name":"mobile","version":"1.0.0"}')
+  await f.file('mobile/android/app/build.gradle', 'versionCode 1000000\nversionName "1.0.0"')
+  await assert.rejects(versions(f.ctx), /Invalid JSON in workspace package-lock\.json/)
+  assert.equal(f.calls.length, 0)
+})
+test('bumping with a custom version source cannot modify a different package.json', async () => {
+  const f = await fixture({ version: 1, capacitor: { packageJson: 'version.json' } }, { platform: 'android', bump: 'patch' })
+  await f.file('package.json', '{"name":"other","version":"8.0.0"}')
+  await f.file('version.json', '{"version":"1.0.0"}')
+  await f.file('android/app/build.gradle', 'versionCode 1000000\nversionName "1.0.0"')
+  await assert.rejects(versions(f.ctx), /owning package\.json/)
+  assert.equal(f.calls.length, 0)
 })
 test('Capacitor builds separately for each platform and preserves hooks', async () => {
   const f = await fixture({ version: 1, capacitor: { platforms: ['android', 'ios'], prepare: [['node', 'prepare.mjs']], buildByPlatform: { ios: ['node', 'ios-build.mjs'], android: ['node', 'android-build.mjs'] }, afterSync: [['node', 'post.mjs', '{platform}']], verify: [['node', 'verify.mjs', '{platform}']] } }, { 'dry-run': true })

@@ -5,7 +5,7 @@ import { validateConfig } from '../dist/config.js'
 import { resolveBuildSettings } from '../dist/build-settings.js'
 import { fixture } from './helpers.mjs'
 
-const settings = { android: { all: ['sharedFlag=on'], debug: ['kindIs=debug'], release: ['kindIs=release'], 'internal-only': ['yttAnalytics=true'] }, ios: { release: ['A=1'], 'testflight-only': ['B=2'] } }
+const settings = { android: { all: ['sharedFlag=on'], debug: ['kindIs=debug'], release: ['kindIs=release'], 'internal-only': ['diagnostics=true'] }, ios: { release: ['A=1'], 'testflight-only': ['B=2'] } }
 
 async function gradleArgs(flags, config = { version: 1, buildSettings: settings }) {
   const f = await fixture(config, { 'dry-run': true, ...flags })
@@ -16,7 +16,7 @@ async function gradleArgs(flags, config = { version: 1, buildSettings: settings 
 test('Android builds receive the platform list, then their configuration list, then an optional custom kind, as Gradle properties', async () => {
   assert.deepEqual(await gradleArgs({ configuration: 'release', format: 'aab' }), ['-PsharedFlag=on', '-PkindIs=release', ':app:bundleRelease'])
   assert.deepEqual(await gradleArgs({ configuration: 'debug', format: 'apk' }), ['-PsharedFlag=on', '-PkindIs=debug', ':app:assembleDebug'])
-  assert.deepEqual(await gradleArgs({ configuration: 'release', format: 'aab', kind: 'internal-only', clean: true }), ['clean', '-PsharedFlag=on', '-PkindIs=release', '-PyttAnalytics=true', ':app:bundleRelease'])
+  assert.deepEqual(await gradleArgs({ configuration: 'release', format: 'aab', kind: 'internal-only', clean: true }), ['clean', '-PsharedFlag=on', '-PkindIs=release', '-Pdiagnostics=true', ':app:bundleRelease'])
   assert.deepEqual(await gradleArgs({ configuration: 'release', format: 'aab' }, { version: 1 }), [':app:bundleRelease'], 'nothing changes without configuration')
 })
 
@@ -39,7 +39,7 @@ test('an Android kind must be defined in the configuration; reserved and malform
 
 test('resolveBuildSettings keeps the order all, then each kind, and ignores kinds that are not configured', () => {
   const config = { version: 1, buildSettings: settings }
-  assert.deepEqual(resolveBuildSettings(config, 'android', ['release', 'internal-only']), ['sharedFlag=on', 'kindIs=release', 'yttAnalytics=true'])
+  assert.deepEqual(resolveBuildSettings(config, 'android', ['release', 'internal-only']), ['sharedFlag=on', 'kindIs=release', 'diagnostics=true'])
   assert.deepEqual(resolveBuildSettings(config, 'ios', ['release']), ['A=1'])
   assert.deepEqual(resolveBuildSettings({ version: 1 }, 'ios', ['release']), [])
 })

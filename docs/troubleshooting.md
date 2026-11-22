@@ -9,6 +9,7 @@ Start with `npm exec -- rds <module> <command> --help`. The [command registry](.
 | A JavaScript tool cannot be located | Install the relevant tool in the consuming project/workspace. `rds` resolves consumer dependencies, not a global copy or a download-on-demand replacement. |
 | Config/flag is rejected | Check spelling and use the installed command's `--help`. Unknown fields and flags are deliberately rejected. Keep `version: 1` in config. |
 | A workspace changes the wrong package | Set `capacitor.packageJson` relative to config root. Confirm the owning manifest and lockfile before bumping. Module roots are not automatically overridden by `--cwd`. |
+| A shared npm lockfile does not change on a version bump | Keep the RDS config at or above the npm workspace root. RDS only updates existing lockfiles with an entry for the package; it does not generate or regenerate the dependency graph. |
 | Generated assets are stale | Generate once to establish the native snapshot, then use `--check`. Regenerate from the correct source after intended edits; do not bypass a stale check by manually changing hashes. |
 | Production action is blocked | Confirm the destination/environment and operator approval, then use `--allow-production`. Retain configured verification hooks; do not delete a stronger gate just to make the command succeed. |
 | More than one Android device or iOS simulator is available | Select an authorized/booted target with `--device`. For physical Android installation, `--physical` filters emulators. |

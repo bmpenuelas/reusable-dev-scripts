@@ -49,7 +49,7 @@ export default defineConfig({
 
 The example above assumes an existing Vue/Capacitor app and native projects. Replace example identifiers and paths; `rds` does not create the application. For a web-only project, configure just `vue`.
 
-Start from the [configuration examples](examples/): [Capacitor](examples/capacitor.config.mjs), [workspaces](examples/workspace.config.mjs), [stores](examples/store.config.mjs), [VS Code](examples/vscode.config.mjs), [Electron](examples/electron.config.mjs), [Swift](examples/swift.config.mjs), [services](examples/services.config.mjs), or [hosting](examples/hosting.config.mjs).
+Start from the [configuration examples](examples/): [Capacitor](examples/capacitor.config.mjs), [workspaces](examples/workspace.config.mjs), [stores](examples/store.config.mjs), [store media](examples/media.config.mjs), [VS Code](examples/vscode.config.mjs), [Electron](examples/electron.config.mjs), [Swift](examples/swift.config.mjs), [services](examples/services.config.mjs), or [hosting](examples/hosting.config.mjs).
 
 Config is discovered upward from the working directory, so workspace commands can use a root config. A JSON alternative, `reusable-dev-scripts.config.json`, is also supported. `--cwd` and `--config` make working-directory/config selection explicit.
 
@@ -160,7 +160,8 @@ Each command below starts with `rds`. Configure only the modules you use.
 | Agent skill | `skill install` |
 | Vue/Vite | `vue build` |
 | Capacitor | `capacitor sync`, `copy`, `open`, `live`, `versions`, `prepare`, `assets`, `locales`, `screenshots` |
-| Android | `android build`, `install`, `start-adb` |
+| Android | `android build` (with `--kind <name>` for project-defined build settings), `install`, `start-adb` |
+| Store media | `media list`, `scaffold`, `view`, `capture`, `render`, `check`, `sheet` |
 | Mobile stores | `store scaffold`, `check`, `changelog`, `export`, `upload-listing`, `upload-build`, `pull`, `doctor`, `verify`, `run` |
 | VS Code | `vscode package`, `publish` |
 | Electron | `electron dev`, `assets`, `clean`, `build`, `notarize` |

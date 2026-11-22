@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { requireValue } from './runtime.js'
+import { validateMedia } from './media-catalog.js'
 import { validateBuildSettings } from './build-settings.js'
 import type { Config, Command } from './types.js'
 
@@ -11,7 +12,7 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'platformio', 'buildSettings', 'hostinger', 'defaultEnvironment']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'platformio', 'buildSettings', 'media', 'hostinger', 'defaultEnvironment']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
     if (key !== 'version' && key !== 'defaultEnvironment') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
@@ -37,6 +38,7 @@ export function validateConfig(value: unknown): Config {
   const hookList = (value: unknown) => { if (value === undefined) return; requireValue(Array.isArray(value), 'Hooks must be arrays of argv commands'); value.forEach(validateCommand) }
   for (const section of Object.values(data)) if (section && typeof section === 'object' && 'root' in section) requireValue(typeof section.root === 'string' && !!section.root, 'Module root must be a non-empty string')
   const config = data as unknown as Config
+  if (config.capacitor?.packageJson !== undefined) requireValue(typeof config.capacitor.packageJson === 'string' && config.capacitor.packageJson.length > 0 && !config.capacitor.packageJson.includes('\0'), 'capacitor.packageJson must be a non-empty path')
   if (config.store?.allowExternalCredentials !== undefined) requireValue(typeof config.store.allowExternalCredentials === 'boolean', 'store.allowExternalCredentials must be a boolean')
   for (const name of ['playKey', 'appleKey'] as const) {
     const value = config.store?.[name]
@@ -122,6 +124,7 @@ export function validateConfig(value: unknown): Config {
   if (config.prisma) requireValue(typeof config.prisma.envFile === 'string' && config.prisma.envFile.length > 0, 'prisma.envFile must be a non-empty string')
   if (config.prisma?.variable !== undefined) requireValue(typeof config.prisma.variable === 'string' && /^[A-Za-z_]\w*$/u.test(config.prisma.variable), 'prisma.variable must be an environment variable name')
   if (config.platformio?.coreDir !== undefined) requireValue(typeof config.platformio.coreDir === 'string' && config.platformio.coreDir.length > 0 && !config.platformio.coreDir.includes('\0'), 'platformio.coreDir must be a non-empty path')
+  validateMedia(config); hookList(config.media?.hooks?.beforeRender); hookList(config.media?.hooks?.afterRender)
   hookList(config.production?.verify)
   for (const section of [config.capacitor, config.electron, config.vscode, config.browser]) hookList(section?.prepare)
   hookList(config.capacitor?.afterBuild); hookList(config.capacitor?.afterSync); hookList(config.capacitor?.verify); hookList(config.store?.hooks?.beforeUpload); hookList(config.store?.hooks?.afterBuildUpload)

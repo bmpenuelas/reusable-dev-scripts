@@ -7,7 +7,7 @@
 | Operation | Behavior to review before execution |
 | --- | --- |
 | Vue/native build and sync | Can write build outputs, generated resources and native project files |
-| Native version synchronization | Writes version settings; `--bump` also changes package/lockfile versions |
+| Native version synchronization | Writes version settings; `--bump` also changes the owning manifest and existing npm lockfile versions, including the matching workspace entry inside the config root |
 | Android install | Replaces an installed APK with `adb install -r`; `--replace` explicitly uninstalls first and deletes local app data |
 | Screenshots | Writes captures/resized files; opening a session can build and install the app |
 | Store hooks | `store.hooks.beforeUpload` and `afterBuildUpload` run your commands (for example a Git commit) with your permissions; `afterBuildUpload` runs only after the store accepted a build |
@@ -23,6 +23,7 @@
 | `dev tabs` | Opens terminal windows that run the configured processes with your permissions; the processes outlive the command and are not stopped by it |
 | `env generate` | Writes the files the project module returns, including secrets; keep them ignored by Git |
 | `prisma migrate` | Changes the schema of the database named by the generated environment file; protected environments need `--allow-production` and the typed or `--confirm-host` host |
+| `media` | `scaffold`, `capture`, `render` and `sheet` write files below `media.root` and the store tree; `capture` and `render` run the project's capture module and design pages in a headless browser with your permissions, and a design can reach the network unless `media.offline` is set. `view` serves `media.root` and `media.serve` read-only on 127.0.0.1 and writes nothing. No `media` command uploads anything or contacts a store |
 | `platformio` | Runs whatever PlatformIO subcommand you pass after `--` (builds, uploads, erase, `pkg exec` tools) with your permissions and the real device attached; rds does not restrict or guard it, so flashing policy belongs in the calling script |
 | `exec` and project hooks | Run exactly the requested tool/argv; they are not restricted to the other modules' effects |
 

@@ -26,7 +26,8 @@ test('every public command can plan without writes, subprocesses or credential v
     wait: { targets: { database: { host: '127.0.0.1', port: 9 } } },
     env: { module: 'scripts/environments.mjs' },
     prisma: { envFile: '.env.{env}' },
-    platformio: { root: '.' }
+    platformio: { root: '.' },
+    media: { platforms: ['android'], locales: ['en'], capture: { module: 'scripts/never-loaded.mjs', baseUrl: 'http://localhost:5173', scenes: [{ id: 'home', viewport: { width: 400, height: 800 } }] } }
   }
   const f = await fixture(config); await f.file('reusable-dev-scripts.config.json', JSON.stringify(config))
   await f.file('scripts/environments.mjs', "export const defaults = () => ({ greeting: 'hello' })\nexport const outputs = (env, config) => [{ path: 'generated.env', content: `GREETING=${config.greeting}\\n` }]\n")

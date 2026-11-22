@@ -7,6 +7,7 @@ Copy the relevant config into your application as `reusable-dev-scripts.config.m
 | [capacitor.config.mjs](capacitor.config.mjs) | Existing Vue/Capacitor application with native projects and icon artwork |
 | [workspace.config.mjs](workspace.config.mjs) | Frontend/backend/extension roots with explicit version ownership |
 | [store.config.mjs](store.config.mjs) | Existing mobile app and application-owned listing/credentials |
+| [media.config.mjs](media.config.mjs) | Existing app with store listings, a Playwright install and a capture module you write |
 | [vscode.config.mjs](vscode.config.mjs) | Existing compile alias and VS Code manifest |
 | [electron.config.mjs](electron.config.mjs) | Existing frontend build and Electron entry/builder config |
 | [swift.config.mjs](swift.config.mjs) | Existing SwiftPM product with plist, resources and entitlements |

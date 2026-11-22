@@ -38,6 +38,7 @@ try {
   assert.ok(files.includes('skills/reusable-dev-scripts/SKILL.md'), 'Missing bundled adoption skill')
   assert.ok(files.includes('dist/skill.js'), 'Missing skill installer')
   assert.ok(files.includes('dist/result.js'), 'Missing result banner runtime')
+  assert.ok(files.includes('dist/npm-version.js'), 'Missing npm version bump runtime')
   for (const expected of ['bin/rds.mjs', 'dist/cli.js', 'dist/index.js', 'dist/index.d.ts', 'src/types.ts', 'src/cli.ts', 'support/store/Fastfile', 'support/store/Gemfile.lock', 'support/store/metadata.mjs', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'LICENSE']) assert.ok(files.includes(expected), `Missing packed file: ${expected}`)
   assert.ok(!files.some(path => /^(test|node_modules|\.rds)\//u.test(path)), 'Packed private or generated development files')
   for (const name of files) if (/\.(?:md|mjs|js|json|ts)$/u.test(name)) assertPortableText(await readFile(join(source, name), 'utf8'), name)

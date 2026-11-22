@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { inside, requireValue, runProcess } from './runtime.js'
 import { validateCommand } from './config.js'
+import type { MediaHost } from './media-render.js'
 import type { Command, Config, Flags, Invocation, Runner } from './types.js'
 
 function hasEnvironments(config: Config): boolean {
@@ -14,6 +15,8 @@ export class Context {
   /** True when no environment was named anywhere and the neutral one was assumed (a project without environments). */
   implicitEnvironment = false
   readonly dryRun: boolean
+  /** Browser access for the media commands; tests inject a fake, otherwise the project's own Playwright is used. */
+  mediaHost?: MediaHost
   readonly plan: Invocation[] = []
   /** Set by the executable boundary, not by programmatic workflow consumers. */
   resultBannerOwner = false
@@ -71,7 +74,7 @@ export class Context {
     requireValue(this.dryRun || this.boolean('allow-production'), 'Production operation requires --allow-production')
     await this.hooks(this.config.production?.verify, this.root, platform)
   }
-  moduleRoot(key: 'vue' | 'capacitor' | 'android' | 'store' | 'electron' | 'swift' | 'vscode' | 'browser' | 'dev' | 'prisma' | 'platformio'): string {
+  moduleRoot(key: 'vue' | 'capacitor' | 'android' | 'store' | 'electron' | 'swift' | 'vscode' | 'browser' | 'dev' | 'prisma' | 'platformio' | 'media'): string {
     return this.path(this.config[key]?.root ?? '.')
   }
 }

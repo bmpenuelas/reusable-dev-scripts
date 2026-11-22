@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Store media</title>
+  <link rel="stylesheet" href="/_rds/viewer.css">
+</head>
+<body>
+  <header>
+    <strong>Store media</strong>
+    <select id="asset" aria-label="Asset"></select>
+    <select id="locale" aria-label="Language"></select>
+    <div class="modes" role="group" aria-label="View">
+      <button data-mode="design">Design</button><button data-mode="listing">Store listing</button><button data-mode="final">Final images</button><button data-mode="languages" title="The final images of every language, one row each">Languages</button>
+    </div>
+    <div class="zoom" role="group" aria-label="View zoom">
+      <button id="zoom-out" type="button" title="Zoom the view out" aria-label="Zoom the view out">−</button><button id="zoom-fit" type="button" title="Back to the size that fits"><span id="zoom-level">Fit</span></button><button id="zoom-in" type="button" title="Zoom the view in" aria-label="Zoom the view in">+</button>
+    </div>
+    <label><input type="checkbox" id="guides" checked> Guides</label>
+    <label><input type="checkbox" id="dark"> Dark</label>
+    <span id="status" role="status"></span>
+  </header>
+  <main>
+    <nav id="assets" aria-label="Assets"></nav>
+    <section id="stage"></section>
+    <aside id="spec"></aside>
+  </main>
+  <script type="module" src="/_rds/viewer.js"></script>
+</body>
+</html>

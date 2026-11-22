@@ -10,6 +10,7 @@ import { electron, electronAssets, swift } from '../dist/desktop.js'
 import sharp from 'sharp'
 import { ownedDirectory } from '../dist/files.js'
 import { store, storeSettings } from '../dist/store.js'
+import { runProcess } from '../dist/runtime.js'
 import { fixture } from './helpers.mjs'
 
 test('VS Code publishes exactly the same VSIX to both registries', async () => {
@@ -18,6 +19,26 @@ test('VS Code publishes exactly the same VSIX to both registries', async () => {
   const packageStep = f.ctx.plan.find(x => x.args[0] === 'package'), marketplace = f.ctx.plan.find(x => x.args[0] === 'publish' && x.command === 'vsce'), openvsx = f.ctx.plan.find(x => x.command === 'ovsx')
   assert.equal(packageStep.args[2], marketplace.args[2]); assert.equal(packageStep.args[2], openvsx.args[1]); assert.ok(packageStep.args.includes('--no-dependencies'))
   assert.ok(!f.ctx.plan.some(x => x.command === 'git'))
+})
+test('VS Code synchronizes the shared npm lock with the bumped prerelease version before packaging', async () => {
+  const f = await fixture({ version: 1, vscode: { root: 'packages/editor' } }, { bump: 'patch', registry: 'marketplace' })
+  await f.file('package.json', '{"name":"parent","version":"9.0.0","workspaces":["packages/*"]}')
+  await f.file('packages/editor/package.json', '{"name":"editor","version":"1.2.3-beta.1"}')
+  const lockPath = await f.file('npm-shrinkwrap.json', '{"lockfileVersion":2,"packages":{"packages/editor":{"version":"1.2.3-beta.1"},"node_modules/editor":{"resolved":"packages/editor","link":true}},"dependencies":{"editor":{"version":"file:packages/editor"}}}')
+  f.ctx.runner = async step => {
+    f.calls.push(step)
+    if (step.command === 'npm') return runProcess(step)
+    if (step.args[0] === 'package') {
+      const lock = JSON.parse(await readFile(lockPath, 'utf8'))
+      assert.equal(lock.packages['packages/editor'].version, '1.2.3')
+      assert.equal(lock.dependencies.editor.version, 'file:packages/editor')
+      await f.file('packages/editor/editor-1.2.3.vsix', 'synthetic')
+    }
+    return { stdout: '', stderr: '' }
+  }
+  await vscode(f.ctx, 'publish')
+  assert.deepEqual(f.calls.map(step => step.command), ['npm', 'vsce', 'vsce'])
+  assert.equal(f.calls[1].args[2], join(f.root, 'packages/editor/editor-1.2.3.vsix'))
 })
 test('browser packaging produces a ZIP with a manifest and no filesystem paths', async () => {
   const f = await fixture({ version: 1, browser: { directory: 'dist', output: 'release/extension.zip' } })
