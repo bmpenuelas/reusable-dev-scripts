@@ -2,6 +2,12 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
+## 0.10.0
+
+- Added `esp32 check-size --format text|json` (default `text`). With `json`, stdout holds only the measured sizes, also when the binary does not fit its budget (`fits: false`, non-zero exit).
+- `assets.copies` (`capacitor` and `electron`) destinations may now be anywhere inside the config root, for example a web app next to the module root (`../web/public/icon.png`). Paths stay relative to the module root, sources must still be inside it, and traversal or symlinks leaving the config root are still rejected. **Behavior change:** a destination outside the module root but inside the config root was an error before.
+- Added `bundleLocalizations` to `capacitor.localeRegistration.ios.targets`: the languages `CFBundleLocalizations` lists when an app has more than its string files, such as a web UI. It must include every iOS locale; `check-locales` and `register-locales` keep using the iOS locales for everything else. Without it nothing changes. Tested with synthetic projects; no Xcode build was run.
+
 ## 0.9.0
 
 - Added `capacitor check-locales` and `capacitor register-locales` with the `capacitor.localeRegistration` section: the check reads Android's locale config and manifest attribute, Xcode `knownRegions`, localized variant groups and target membership (or synchronized folders), the `.lproj` files and `CFBundleLocalizations` for explicitly listed targets and files, and reports missing and stale languages. `register-locales` is the separate, optional writer for the standard layout: it verifies the complete result before writing anything, preserves line endings, is idempotent and never deletes translation files or creates targets, groups or build phases. Neither runs during `sync`. Tested with synthetic projects; no Xcode or Gradle build was run on registered output.

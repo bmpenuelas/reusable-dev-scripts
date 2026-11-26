@@ -42,11 +42,13 @@ export function validateLocaleRegistration(value: unknown): asserts value is Loc
     requireValue(Array.isArray(ios.targets) && ios.targets.length > 0, 'capacitor.localeRegistration.ios.targets must name at least one Xcode target')
     const seen = new Set<string>()
     for (const target of ios.targets as unknown[]) {
-      fields(target, ['name', 'directory', 'files', 'infoPlist'], 'localization target')
+      fields(target, ['name', 'directory', 'files', 'infoPlist', 'bundleLocalizations'], 'localization target')
       requireValue(typeof target.name === 'string' && target.name.length > 0, 'Each localization target needs the Xcode target name')
       path(target.directory, 'Localization target directory')
       requireValue(Array.isArray(target.files) && target.files.length > 0 && target.files.every(file => typeof file === 'string' && stringsFile.test(file)) && new Set(target.files).size === target.files.length, 'Each localization target needs unique .strings or .stringsdict file names')
       if (target.infoPlist !== undefined && typeof target.infoPlist !== 'boolean') path(target.infoPlist, 'Localization target infoPlist')
+      list(target.bundleLocalizations, 'Localization target bundleLocalizations')
+      if (target.bundleLocalizations !== undefined) requireValue(target.infoPlist ?? target.name === 'App', 'Localization target bundleLocalizations needs an Info.plist; set infoPlist')
       for (const file of target.files as string[]) {
         const key = `${target.name}/${target.directory ?? ''}/${file}`
         requireValue(!seen.has(key), 'A localization target file is configured twice'); seen.add(key)
@@ -56,7 +58,7 @@ export function validateLocaleRegistration(value: unknown): asserts value is Loc
 }
 
 interface AndroidPlan { manifest: string; config: string; locales: string[] }
-interface TargetPlan { name: string; directory: string; relative: string; files: string[]; infoPlist?: string }
+interface TargetPlan { name: string; directory: string; relative: string; files: string[]; infoPlist?: { path: string; locales: string[] } }
 interface IosPlan { project: string; locales: string[]; targets: TargetPlan[] }
 export interface RegistrationPlan { root: string; android?: AndroidPlan; ios?: IosPlan }
 
@@ -80,9 +82,16 @@ export function registrationPlan(ctx: Context): RegistrationPlan {
   }
   if (config.ios && platform !== 'android') {
     const bundle = inside(root, config.ios.project ?? 'ios/App/App.xcodeproj')
+    const native = locales(config.ios.locales)
+    const bundleList = (own: string[] | undefined) => {
+      if (!own) return native
+      const missing = native.filter(code => !own.includes(code))
+      requireValue(!missing.length, `bundleLocalizations must include every iOS locale; add ${missing.join(', ')}`)
+      return own
+    }
     plan.ios = {
       project: outputPath(root, join(relative(root, bundle), 'project.pbxproj')),
-      locales: locales(config.ios.locales),
+      locales: native,
       targets: config.ios.targets.map((target: LocaleRegistrationTarget) => {
         const directory = inside(root, target.directory ?? join(relative(root, dirname(bundle)), target.name))
         const list = target.infoPlist ?? target.name === 'App'
@@ -91,7 +100,7 @@ export function registrationPlan(ctx: Context): RegistrationPlan {
           directory,
           relative: relative(dirname(bundle), directory).split(sep).join('/'),
           files: target.files,
-          ...(list ? { infoPlist: outputPath(root, typeof list === 'string' ? list : join(relative(root, directory), 'Info.plist')) } : {}),
+          ...(list ? { infoPlist: { path: outputPath(root, typeof list === 'string' ? list : join(relative(root, directory), 'Info.plist')), locales: bundleList(target.bundleLocalizations) } } : {}),
         }
       }),
     }
@@ -246,12 +255,10 @@ async function checkIos(root: string, plan: IosPlan, read: Reader): Promise<stri
       problems.push(...differences(children.flatMap(child => child.locale && child.locale !== 'Base' ? [child.locale] : []), plan.locales, label))
     }
     if (target.infoPlist) {
-      const plist = await read(target.infoPlist)
-      if (plist === undefined) problems.push(`${name(target.infoPlist)} does not exist`)
-      else {
-        const list = bundleLocalizations(plist)
-        problems.push(...differences(list.values, plan.locales, `${name(target.infoPlist)} CFBundleLocalizations`))
-      }
+      const { path, locales } = target.infoPlist
+      const plist = await read(path)
+      if (plist === undefined) problems.push(`${name(path)} does not exist`)
+      else problems.push(...differences(bundleLocalizations(plist).values, locales, `${name(path)} CFBundleLocalizations`))
     }
   }
   return [...new Set(problems)]
@@ -394,9 +401,10 @@ export async function localeChanges(plan: RegistrationPlan): Promise<Map<string,
     if (next !== normalized) changes.set(plan.ios.project, next.replaceAll('\n', eol))
     for (const target of plan.ios.targets) {
       if (!target.infoPlist) continue
-      const plist = changes.get(target.infoPlist) ?? await required(target.infoPlist)
-      const updated = registerPlist(plist, plan.ios.locales)
-      if (updated !== plist) changes.set(target.infoPlist, updated)
+      const { path, locales } = target.infoPlist
+      const plist = changes.get(path) ?? await required(path)
+      const updated = registerPlist(plist, locales)
+      if (updated !== plist) changes.set(path, updated)
     }
   }
   const problems = await localeProblems(plan, async path => changes.get(path) ?? readText(path))

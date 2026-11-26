@@ -82,7 +82,7 @@ export async function electronAssets(ctx: Context) {
   const config = ctx.section('electron').assets, root = ctx.moduleRoot('electron')
   requireValue(config, 'Configure electron.assets')
   // Validate every destination before the first write.
-  const copies = assetCopyPlan(root, config, [config.ico, config.icns])
+  const copies = assetCopyPlan(root, config, [config.ico, config.icns], ctx.root)
   await images(ctx, root, config)
   if (config.ico || config.icns) await desktopIcons(ctx, root, config)
   await assetCopies(ctx, copies)

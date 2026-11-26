@@ -1,9 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, symlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { main } from '../dist/cli.js'
+import { runCli } from '../dist/result.js'
 import { validateConfig } from '../dist/config.js'
 import { Context } from '../dist/context.js'
 import { capacitorAssets } from '../dist/images.js'
@@ -115,6 +117,43 @@ test('esp32 check-size enforces the smallest OTA slot, a named slot and the free
   await assert.rejects(f.run('esp32', 'check-size', '--artifact', 'build/none.bin', '--partitions', 'partitions.csv'), /artifact not found/u)
   await assert.rejects(f.run('esp32', 'check-size', '--artifact', '../firmware.bin', '--partitions', 'partitions.csv'), /inside its project/u)
   assert.equal(f.calls.length, 0)
+})
+
+test('esp32 check-size --format json reports the numbers alone on stdout, also when the binary does not fit', async () => {
+  const f = await project({ version: 1 })
+  await f.file('partitions.csv', partitions)
+  await f.file('build/firmware.bin', Buffer.alloc(8000))
+  const args = ['esp32', 'check-size', '--artifact', 'build/firmware.bin', '--partitions', 'partitions.csv']
+  const slots = [{ name: 'ota_0', bytes: 8192 }, { name: 'ota_1', bytes: 12288 }]
+  const capture = async (...extra) => {
+    const original = [console.log, console.error], stdout = [], stderr = []
+    console.log = line => stdout.push(line)
+    console.error = line => stderr.push(line)
+    // The executable boundary with its default logger, banners included.
+    try { return { code: await runCli([...args, ...extra, '--banner', '--cwd', f.root]), stdout, stderr: stderr.join('\n') } }
+    finally { [console.log, console.error] = original }
+  }
+
+  const fits = await capture('--format', 'json', '--min-free-bytes', '100')
+  assert.equal(fits.code, 0)
+  assert.equal(fits.stdout.length, 1)
+  assert.deepEqual(JSON.parse(fits.stdout[0]), { artifactBytes: 8000, budgetBytes: 8192, freeBytes: 192, minFreeBytes: 100, fits: true, slots })
+
+  const over = await capture('--format', 'json', '--min-free-bytes', '193')
+  assert.equal(over.code, 1)
+  assert.equal(over.stdout.length, 1)
+  assert.deepEqual(JSON.parse(over.stdout[0]), { artifactBytes: 8000, budgetBytes: 8192, freeBytes: 192, minFreeBytes: 193, fits: false, slots })
+  assert.match(over.stderr, /requires 193 bytes free/u)
+
+  const planned = await capture('--format', 'json', '--dry-run')
+  assert.deepEqual([planned.code, planned.stdout], [0, []])
+  assert.match(planned.stderr, /\[plan\] Check existing ESP32 binary/u)
+
+  await f.run(...args, '--format', 'json', '--slot', 'factory')
+  assert.deepEqual(JSON.parse(f.logs.at(-1)).slots, [{ name: 'factory', bytes: 65536 }])
+  await f.run(...args, '--format', 'text')
+  assert.equal(f.logs.at(-1), '[rds] ESP32 firmware: 8000/8192 bytes, 192 bytes free')
+  await assert.rejects(f.run(...args, '--format', 'xml'), /--format must be text, json/u)
 })
 
 const badging = [
@@ -265,4 +304,42 @@ test('desktop assets copy generated icons, and unsafe or colliding copies fail b
   assert.throws(() => validateConfig({ version: 1, capacitor: { assets: { copies: [{ source: 'a', path: 'b', normalize: 'webp' }] } } }), /normalize/u)
   assert.throws(() => validateConfig({ version: 1, electron: { assets: { copies: [{ source: 'a' }] } } }), /source and a destination/u)
   assert.throws(() => validateConfig({ version: 1, capacitor: { assets: { copies: [{ source: 'a', path: 'b', prune: true }] } } }), /Unknown asset copy field/u)
+})
+
+test('asset copies may leave the module root for a sibling folder of the same config root', async () => {
+  const copies = [{ source: 'art/icon.png', path: '../web/public/icon.png' }, { source: 'art/icon.png', path: 'public/icon.png' }]
+  const config = { version: 1, capacitor: { root: 'frontend', assets: { native: false, copies } }, electron: { root: 'desktop', assets: { copies: [{ source: 'mark.txt', path: '../web/public/mark.txt' }] } } }
+  const f = await project(config)
+  await f.file('frontend/art/icon.png', await png('#f00'))
+  await f.file('desktop/mark.txt', 'mark')
+  await assert.rejects(f.run('capacitor', 'assets', '--check'), /stale/u)
+  await f.run('capacitor', 'assets')
+  await f.run('capacitor', 'assets', '--check')
+  for (const path of ['web/public/icon.png', 'frontend/public/icon.png']) assert.deepEqual(await readFile(join(f.root, path)), await readFile(join(f.root, 'frontend/art/icon.png')))
+  await f.run('electron', 'assets')
+  assert.equal(await f.read('web/public/mark.txt'), 'mark')
+})
+
+test('asset copies still cannot leave the config root, and sources stay in the module root', async () => {
+  const outside = await mkdtemp(join(tmpdir(), 'reusable-dev-scripts-outside-'))
+  const bad = [
+    [{ source: 'icon.png', path: '../../escape.png' }, /inside its project/u],
+    [{ source: 'icon.png', path: join(outside, 'escape.png') }, /inside its project/u],
+    [{ source: 'icon.png', path: '../linked/escape.png' }, /through a symlink/u],
+    [{ source: 'icon.png', path: 'linked/escape.png' }, /through a symlink/u],
+    [{ source: '../web/icon.png', path: 'out.png' }, /inside its project/u],
+    [{ source: 'icon.png', path: '..' }, /must not replace/u],
+    [{ source: 'icon.png', path: '.' }, /must not replace/u],
+    [{ source: 'icon.png', path: '../frontend/icon.png' }, /overwrite their own inputs/u],
+  ]
+  for (const [copy, expected] of bad) {
+    const f = await fixture({ version: 1, capacitor: { root: 'frontend', assets: { native: false, copies: [{ source: 'icon.png', path: '../web/first.png' }, copy] } } })
+    await f.file('frontend/icon.png', await png('#fff'))
+    await f.file('web/icon.png', await png('#000'))
+    // Junctions need no special privilege on Windows; the type is ignored elsewhere.
+    for (const link of ['linked', 'frontend/linked']) await symlink(outside, join(f.root, link), 'junction')
+    await assert.rejects(capacitorAssets(f.ctx), expected)
+    await assert.rejects(readFile(join(f.root, 'web/first.png')), /ENOENT/u)
+  }
+  await assert.rejects(readFile(join(outside, 'escape.png')), /ENOENT/u)
 })

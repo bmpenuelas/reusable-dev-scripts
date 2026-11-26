@@ -64,7 +64,7 @@ export const commands: Record<string, string[]> = {
   'electron dev': [], 'electron assets': ['check'], 'electron clean': [], 'electron build': ['platform', 'arch', 'format', 'clean', 'unsigned'],
   'electron notarize': ['artifact', 'staple', 'profile', 'preflight'],
   'electron check-signing-identity': ['identity'],
-  'esp32 check-size': ['artifact', 'partitions', 'slot', 'min-free-bytes'],
+  'esp32 check-size': ['artifact', 'partitions', 'slot', 'min-free-bytes', 'format'],
   'app-links generate': [], 'app-links check': [],
   'swift icons': [], 'swift bundle': ['open'],
   'cloudflare setup-pages': ['target', 'yes'],
@@ -86,11 +86,11 @@ export const commands: Record<string, string[]> = {
 const passthroughCommands = ['exec', 'platformio', 'vue build', 'android build', 'store run']
 /** Commands whose help is one explanatory sentence after the option list. */
 const describedHelp: Record<string, string> = {
-  'capacitor check-locales': 'Read-only: verify that Android and Xcode declare every configured locale. Needs capacitor.localeRegistration.',
-  'capacitor register-locales': 'Update the Android locale list and manifest, Xcode localizations and CFBundleLocalizations. Writes nothing unless the result passes check-locales.',
+  'capacitor check-locales': 'Read-only: verify that Android and Xcode declare every configured locale. Needs capacitor.localeRegistration. CFBundleLocalizations must match the iOS locales, or the bundleLocalizations of that Xcode target.',
+  'capacitor register-locales': 'Update the Android locale list and manifest, Xcode localizations and CFBundleLocalizations (from the bundleLocalizations of a target that sets it). Writes nothing unless the result passes check-locales.',
   'android inspect': 'Read package, version, SDK levels and permissions from an APK with aapt2. --format text (default) or json.',
   'electron check-signing-identity': 'Check on macOS that the Developer ID Application identity named by --identity or CSC_NAME is installed. Signs nothing.',
-  'esp32 check-size': 'Compare a built ESP32 binary with its app partitions: --artifact <firmware.bin> --partitions <partitions.csv>, optionally --slot <name> and --min-free-bytes <n>.',
+  'esp32 check-size': 'Compare a built ESP32 binary with its app partitions: --artifact <firmware.bin> --partitions <partitions.csv>, optionally --slot <name> and --min-free-bytes <n>. --format text (default) or json.',
   'app-links generate': 'Write assetlinks.json and apple-app-site-association from the appLinks configuration. Deploys nothing.',
   'app-links check': 'Read-only: compare both association files with the appLinks configuration.',
   'wait http': 'Wait for an exact HTTP status and optional response-header marker from a configured wait target. Does not follow redirects.',
@@ -123,7 +123,7 @@ export function parse(argv: string[]) {
 export function help(key = ''): string {
   if (Object.hasOwn(describedHelp, key)) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${describedHelp[key]}\n`
   if (key.startsWith('hosting ') && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${key === 'hosting reset' ? 'Permanently delete and recreate' : key === 'hosting drop' ? 'Permanently delete (the database is always discarded)' : 'Continue the drop journal and recreate'} the exact hosted resources. Protected environments are forbidden. Temporary domains change automatically. Consumer deployment remains separate.\n`
-  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${passthroughCommands.includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}${['capacitor versions', 'capacitor prepare', 'vscode publish'].includes(key) ? '--bump updates the owning package and its existing npm workspace lockfile entry without running npm lifecycle scripts or changing Git.\n' : ''}${key === 'android build' ? '--reveal is best-effort; file-manager failure only warns after a verified build.\n' : ''}${key === 'android install' ? 'android.appId must match the APK application ID, including any debug suffix. --replace deletes only that configured package and its data.\n' : ''}${key === 'electron notarize' ? 'A ZIP cannot be stapled: --staple names the .app inside it. --artifact/--staple may use * in the last path segment if it matches exactly one item. Profile: --profile, APPLE_NOTARY_PROFILE, then electron.notaryProfile.\n' : ''}${key === 'store upload-build' ? 'store.hooks.afterBuildUpload runs only after the store accepted the build.\n' : ''}`
+  if (key && commands[key]) return `rds ${key}\nOptions: ${[...Object.keys(globalOptions), ...commands[key]!].map(x => `--${x}${options[x] === 'string' ? ' <value>' : ''}`).join(' ')}\n${passthroughCommands.includes(key) ? 'Pass literal tool arguments after --.\n' : ''}${['capacitor sync', 'capacitor copy', 'capacitor prepare'].includes(key) ? 'capacitor.afterBuild runs after each web build, before native sync/copy; --skip-build skips it.\n' : ''}${['capacitor versions', 'capacitor prepare', 'vscode publish'].includes(key) ? '--bump updates the owning package and its existing npm workspace lockfile entry without running npm lifecycle scripts or changing Git.\n' : ''}${['capacitor assets', 'electron assets'].includes(key) ? 'assets.copies paths are relative to the module root; sources stay inside it, destinations may be anywhere inside the config root.\n' : ''}${key === 'android build' ? '--reveal is best-effort; file-manager failure only warns after a verified build.\n' : ''}${key === 'android install' ? 'android.appId must match the APK application ID, including any debug suffix. --replace deletes only that configured package and its data.\n' : ''}${key === 'electron notarize' ? 'A ZIP cannot be stapled: --staple names the .app inside it. --artifact/--staple may use * in the last path segment if it matches exactly one item. Profile: --profile, APPLE_NOTARY_PROFILE, then electron.notaryProfile.\n' : ''}${key === 'store upload-build' ? 'store.hooks.afterBuildUpload runs only after the store accepted the build.\n' : ''}`
   return `rds — type-specific development and release scripts\n\n${Object.keys(commands).map(x => `  rds ${x}`).join('\n')}\n\nGlobal: --cwd <directory> --config <file> --env <name> --dry-run --allow-production --banner --no-banner\nResult banners default to on; configure output.banners or RDS_BANNERS=0|1.\nUse rds <module> <command> --help for options. Dry-run redacts argv and secret values.\n`
 }
 export async function main(argv: string[], runner?: Runner, log: (message: string) => void = console.log, onContext?: (ctx: Context) => void): Promise<Context | undefined> {
@@ -170,7 +170,9 @@ export async function main(argv: string[], runner?: Runner, log: (message: strin
         await androidInspect(ctx, log)
       } else await androidInstall(ctx)
       break
-    case 'esp32': await firmwareSize(ctx); break
+    case 'esp32':
+      if (log === console.log && flags.format === 'json') ctx.log = message => console.error(message)
+      await firmwareSize(ctx, log); break
     case 'app-links': await appLinks(ctx, action === 'check'); break
     case 'store': requireValue(!flags.format || flags.format === 'csv', 'Only CSV store export is implemented'); await store(ctx, action!, forwarded); break
     case 'vscode': await vscode(ctx, action!); break

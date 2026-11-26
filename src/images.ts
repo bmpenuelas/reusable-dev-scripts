@@ -1,7 +1,7 @@
 import sharp from 'sharp'
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { inside, outputPath, requireValue, writeChanged } from './runtime.js'
 import type { Context } from './context.js'
 import type { Images, NativeLocales } from './types.js'
@@ -21,10 +21,12 @@ export async function images(ctx: Context, root: string, config: Images) {
     if (!ctx.dryRun) await writeChanged(path, bytes, ctx.boolean('check'))
   }
 }
-export function assetCopyPlan(root: string, config: Images, extraOutputs: (string | undefined)[] = []) {
+/** Paths are relative to the module `root`. Sources stay inside it; destinations may be anywhere inside `destinationRoot`. */
+export function assetCopyPlan(root: string, config: Images, extraOutputs: (string | undefined)[] = [], destinationRoot = root) {
   const key = (path: string) => path.toLowerCase()
   const entries = (config.copies ?? []).map(entry => {
-    const source = inside(root, entry.source), path = outputPath(root, entry.path)
+    const source = inside(root, entry.source), path = outputPath(destinationRoot, resolve(root, entry.path))
+    requireValue(path !== resolve(root), 'An output must not replace the project directory')
     requireValue(!entry.normalize || (entry.normalize === 'png' && /\.png$/iu.test(path)), 'PNG normalization needs a .png destination')
     return { source, path, normalize: entry.normalize }
   })
@@ -86,7 +88,7 @@ export async function locales(ctx: Context) {
 export async function capacitorAssets(ctx: Context) {
   const root = ctx.moduleRoot('capacitor'), config = ctx.section('capacitor').assets; requireValue(config, 'Configure capacitor.assets')
   requireValue(config.native === false || config.source, 'Configure an image source for native assets')
-  const copies = assetCopyPlan(root, config, ['.rds/native-assets.json', '.rds/asset-input/icon.png'])
+  const copies = assetCopyPlan(root, config, ['.rds/native-assets.json', '.rds/asset-input/icon.png'], ctx.root)
   await images(ctx, root, config)
   if (config.native !== false) {
     // Fingerprint only the native asset inputs; the platform generator remains the consumer's pinned tool.

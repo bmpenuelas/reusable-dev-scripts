@@ -299,3 +299,47 @@ test('project edits tolerate a list without a trailing comma', () => {
   assert.deepEqual(stringsAt(parsePbx(appendItem(inline, arrayAt(parsePbx(inline), 'items'), 'two')), 'items'), ['one', 'two'])
   assert.throws(() => parsePbx('{ a = ( b; }'), /Cannot parse/u)
 })
+
+test('bundleLocalizations lets CFBundleLocalizations list more languages than the string files', async () => {
+  const web = [...codes, 'de', 'fr']
+  const withBundle = bundleLocalizations => {
+    const used = structuredClone(config)
+    used.capacitor.localeRegistration.ios.targets[0].bundleLocalizations = bundleLocalizations
+    return used
+  }
+  const f = await native({ config: withBundle(web) })
+  assert.match(await failure(f.run('capacitor', 'check-locales')), /App\/Info\.plist CFBundleLocalizations is missing en, es, pt-BR, de, fr/u)
+  await f.run('capacitor', 'register-locales')
+  await f.run('capacitor', 'check-locales')
+  const info = await f.read(PLIST)
+  assert.match(info, /<array>\n\t\t<string>en<\/string>\n\t\t<string>es<\/string>\n\t\t<string>pt-BR<\/string>\n\t\t<string>de<\/string>\n\t\t<string>fr<\/string>\n\t<\/array>/u)
+  // The extra languages are declared in the plist only: Xcode gets no regions or variants without string files.
+  const xcode = await f.read(PROJECT)
+  assert.doesNotMatch(xcode, /\bfr\b|fr\.lproj/u)
+  const before = await snapshot(f)
+  await f.run('capacitor', 'register-locales')
+  assert.deepEqual(await snapshot(f), before)
+
+  // The explicit list is exact too: a plist with only the native languages, or with an extra one, is reported.
+  await f.file(PLIST, info.replace('\t\t<string>fr</string>\n', '\t\t<string>it</string>\n'))
+  const message = await failure(f.run('capacitor', 'check-locales'))
+  assert.match(message, /CFBundleLocalizations is missing fr/u)
+  assert.match(message, /CFBundleLocalizations still lists it/u)
+})
+
+test('bundleLocalizations must cover the iOS locales and belong to a checked Info.plist', async () => {
+  const short = structuredClone(config)
+  short.capacitor.localeRegistration.ios.targets[0].bundleLocalizations = ['en', 'fr']
+  const f = await native({ config: short })
+  const before = await snapshot(f)
+  for (const command of ['check-locales', 'register-locales']) await assert.rejects(f.run('capacitor', command), /must include every iOS locale; add es, pt-BR/u)
+  assert.deepEqual(await snapshot(f), before)
+
+  const target = value => () => validateConfig({ version: 1, capacitor: { localeRegistration: { ios: { targets: [{ files: ['Localizable.strings'], ...value }] } } } })
+  assert.throws(target({ name: 'Widget', bundleLocalizations: ['en'] }), /needs an Info\.plist/u)
+  assert.throws(target({ name: 'App', infoPlist: false, bundleLocalizations: ['en'] }), /needs an Info\.plist/u)
+  assert.throws(target({ name: 'App', bundleLocalizations: [] }), /unique locale codes/u)
+  assert.throws(target({ name: 'App', bundleLocalizations: ['en', 'en'] }), /unique locale codes/u)
+  assert.doesNotThrow(target({ name: 'Widget', infoPlist: true, bundleLocalizations: ['en'] }))
+  assert.doesNotThrow(target({ name: 'App', bundleLocalizations: ['en'] }))
+})

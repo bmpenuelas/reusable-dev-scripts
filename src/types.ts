@@ -19,6 +19,8 @@ export interface LocaleRegistrationTarget {
   files: string[]
   /** Info.plist whose CFBundleLocalizations must list the locales: `true` for `<directory>/Info.plist`, a path, or `false`. Default true for the target named App. */
   infoPlist?: boolean | string
+  /** Languages CFBundleLocalizations lists when the app has more than its string files, for example from a web UI. Must include every iOS locale; needs this target's Info.plist. Default: the iOS locales. */
+  bundleLocalizations?: string[]
 }
 /** Native declarations of the app's languages. Paths are relative to the Capacitor root and default to the standard Capacitor layout. */
 export interface LocaleRegistration {

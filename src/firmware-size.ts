@@ -22,8 +22,9 @@ export function esp32AppSlots(csv: string) {
   })
 }
 
-export async function firmwareSize(ctx: Context) {
+export async function firmwareSize(ctx: Context, print: (message: string) => void = ctx.log) {
   const file = ctx.string('artifact'), csv = ctx.string('partitions'), slot = ctx.string('slot'), raw = ctx.string('min-free-bytes', '0')
+  const format = ctx.choice('format', ['text', 'json'], 'text')
   requireValue(/\.bin$/iu.test(file) && /\.csv$/iu.test(csv), 'Provide --artifact <firmware.bin> and --partitions <partitions.csv>')
   requireValue(/^\d+$/u.test(raw) && Number.isSafeInteger(Number(raw)), '--min-free-bytes must be a non-negative integer')
   const artifact = ctx.path(file), table = ctx.path(csv), minimum = Number(raw)
@@ -34,7 +35,9 @@ export async function firmwareSize(ctx: Context) {
   requireValue(metadata.isFile() && metadata.size > 0, 'ESP32 firmware artifact must be a non-empty file')
   const slots = esp32AppSlots(await readFile(table, 'utf8')).filter(entry => slot ? entry.name === slot : entry.ota)
   requireValue(slots.length, slot ? 'Selected ESP32 app partition was not found' : 'No ESP32 OTA app partitions found; select a named app partition with --slot')
-  const budget = Math.min(...slots.map(entry => entry.bytes)), free = budget - metadata.size
-  requireValue(free >= minimum, `ESP32 firmware is ${metadata.size} bytes; slot budget is ${budget} bytes and requires ${minimum} bytes free (available: ${free})`)
-  ctx.log(`[rds] ESP32 firmware: ${metadata.size}/${budget} bytes, ${free} bytes free`)
+  const budget = Math.min(...slots.map(entry => entry.bytes)), free = budget - metadata.size, fits = free >= minimum
+  // JSON is printed before the budget is enforced: a binary that does not fit is when a caller most needs the numbers.
+  if (format === 'json') print(JSON.stringify({ artifactBytes: metadata.size, budgetBytes: budget, freeBytes: free, minFreeBytes: minimum, fits, slots: slots.map(({ name, bytes }) => ({ name, bytes })) }, null, 2))
+  requireValue(fits, `ESP32 firmware is ${metadata.size} bytes; slot budget is ${budget} bytes and requires ${minimum} bytes free (available: ${free})`)
+  if (format === 'text') ctx.log(`[rds] ESP32 firmware: ${metadata.size}/${budget} bytes, ${free} bytes free`)
 }

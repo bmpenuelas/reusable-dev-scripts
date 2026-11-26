@@ -214,7 +214,7 @@ export default {
 
 An MJS config can import a local catalogue adapter that returns this data shape. Keep custom widget data and store copy in the application. Add separate targets to emit ordinary watch/widget string files, and `file: 'InfoPlist.strings'` to translate Info.plist values.
 
-Two further pieces are optional. [Locale registration](commands.md#locale-registration) checks that Android and Xcode declare the languages, and `register-locales` maintains those declarations for the standard native layout. Asset `copies` place files that no generator places, and `capacitor assets --check` reports stale ones:
+Two further pieces are optional. [Locale registration](commands.md#locale-registration) checks that Android and Xcode declare the languages, and `register-locales` maintains those declarations for the standard native layout. Asset `copies` place files that no generator places, and `capacitor assets --check` reports stale ones. Copy paths are relative to `capacitor.root`; in a monorepo a destination may leave it for a sibling folder, but never the config root:
 
 ```js
 export default {
