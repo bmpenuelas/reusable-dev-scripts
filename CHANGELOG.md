@@ -2,6 +2,10 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
+## Unreleased
+
+- `rds platformio` now runs the PlatformIO home's own `pio` first: when `PLATFORMIO_CORE_DIR` is set or `platformio.coreDir` is configured and that home has a `penv`, its `pio` comes before PATH (`PLATFORMIO_CMD` still wins). An older `pio` on PATH no longer drives a home whose platforms need a newer PlatformIO Core. **Behavior change** for projects with `coreDir` whose home has its own `penv`.
+
 ## 0.8.0
 
 - Added `storeLocales(codes, overrides?)`, exported from the package: the Google Play and App Store folder names for common app languages, validated against the fastlane versions the shared lanes pin, ready for `store.locales`. Unknown languages and Traditional Chinese must be given explicitly.

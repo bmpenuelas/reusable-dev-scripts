@@ -11,17 +11,20 @@ export function realPlatformioHost(): PlatformioHost {
 }
 
 /**
- * Where the PlatformIO CLI may be, most explicit first: `PLATFORMIO_CMD`, then `pio` / `platformio` on PATH,
- * then the locations the official installers and `pip install --user` use. Only existing files are returned.
+ * Where the PlatformIO CLI may be, most explicit first: `PLATFORMIO_CMD`, then the `pio` of the PlatformIO home this
+ * run uses (`coreDir`: its own `penv`, which matches the platforms and packages installed there), then `pio` /
+ * `platformio` on PATH, then the locations the official installers and `pip install --user` use. Only existing files
+ * are returned.
  */
-export function platformioCandidates(host: PlatformioHost = realPlatformioHost()): string[] {
+export function platformioCandidates(host: PlatformioHost = realPlatformioHost(), coreDir?: string): string[] {
   const windows = host.platform === 'win32', extensions = windows ? ['.exe', '.cmd', '.bat'] : [''], names = ['pio', 'platformio']
   const found: string[] = []
   const explicit = host.env.PLATFORMIO_CMD
   if (explicit) found.push(explicit)
   const pathKey = Object.keys(host.env).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
-  const directories = (host.env[pathKey] ?? '').split(delimiter).filter(Boolean)
   const scripts = windows ? 'Scripts' : 'bin'
+  const directories = coreDir ? [join(coreDir, 'penv', scripts)] : []
+  directories.push(...(host.env[pathKey] ?? '').split(delimiter).filter(Boolean))
   directories.push(join(host.home, '.platformio', 'penv', scripts))
   if (windows) {
     const local = host.env.LOCALAPPDATA, roaming = host.env.APPDATA
@@ -31,16 +34,16 @@ export function platformioCandidates(host: PlatformioHost = realPlatformioHost()
   } else directories.push(join(host.home, '.local', 'bin'))
   for (const directory of directories) for (const name of names) for (const extension of extensions) {
     const candidate = join(directory, name + extension)
-    if (host.exists(candidate)) found.push(candidate)
+    if (host.exists(candidate) && !found.includes(candidate)) found.push(candidate)
   }
   return found
 }
 
 /** The PlatformIO executable to run: `PLATFORMIO_CMD` is authoritative when set (it is never silently replaced). */
-export function resolvePlatformio(host: PlatformioHost = realPlatformioHost()): string | undefined {
+export function resolvePlatformio(host: PlatformioHost = realPlatformioHost(), coreDir?: string): string | undefined {
   const explicit = host.env.PLATFORMIO_CMD
   if (explicit) return /[\\/]/u.test(explicit) ? (host.exists(explicit) ? explicit : undefined) : explicit
-  return platformioCandidates(host)[0]
+  return platformioCandidates(host, coreDir)[0]
 }
 
 /**
@@ -51,10 +54,11 @@ export async function platformio(ctx: Context, forwarded: string[], host: Platfo
   requireValue(forwarded.length > 0, 'Use rds platformio -- <pio arguments>')
   const config = ctx.config.platformio, root = ctx.moduleRoot('platformio')
   requireValue(existsSync(root) || ctx.dryRun, 'The PlatformIO project directory does not exist')
-  // A plan must work on a machine without PlatformIO; a real run needs it.
-  const command = resolvePlatformio(host) ?? (ctx.dryRun ? 'pio' : undefined)
-  requireValue(command, 'PlatformIO CLI was not found. Install PlatformIO or set PLATFORMIO_CMD to the pio executable path.')
   const env: NodeJS.ProcessEnv = {}
   if (config?.coreDir && !host.env.PLATFORMIO_CORE_DIR) env.PLATFORMIO_CORE_DIR = resolve(ctx.root, config.coreDir)
+  // The home this run uses supplies its own pio first. A plan must work on a machine without PlatformIO.
+  const coreDir = host.env.PLATFORMIO_CORE_DIR || env.PLATFORMIO_CORE_DIR
+  const command = resolvePlatformio(host, coreDir) ?? (ctx.dryRun ? 'pio' : undefined)
+  requireValue(command, 'PlatformIO CLI was not found. Install PlatformIO or set PLATFORMIO_CMD to the pio executable path.')
   await ctx.run(command, forwarded, { cwd: root, env, label: 'PlatformIO' })
 }

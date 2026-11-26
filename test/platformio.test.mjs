@@ -22,6 +22,16 @@ test('PlatformIO is found on PATH first, then in the official installer and pip 
   assert.equal(resolvePlatformio(host('linux', [], { PATH: bin })), undefined)
 })
 
+test('the pio of the PlatformIO home in use comes before PATH, and PLATFORMIO_CMD still wins', () => {
+  const core = join('/', 'core-home'), own = join(core, 'penv', 'bin', 'pio')
+  assert.deepEqual(platformioCandidates(host('linux', [pioOnPath, own], { PATH: bin }), core), [own, pioOnPath])
+  assert.equal(resolvePlatformio(host('linux', [pioOnPath, own], { PATH: bin }), core), own)
+  assert.equal(resolvePlatformio(host('linux', [pioOnPath], { PATH: bin }), core), pioOnPath, 'a home without its own pio falls back to PATH')
+  assert.equal(resolvePlatformio(host('linux', [own], { PLATFORMIO_CMD: 'custom-pio' }), core), 'custom-pio')
+  // The default installer home is listed once even when it is also the home in use.
+  assert.deepEqual(platformioCandidates(host('linux', [installer], {}), join(home, '.platformio')), [installer])
+})
+
 test('on Windows the newest Python user Scripts directory is used whatever its minor version', () => {
   const local = join('/', 'profile', 'AppData', 'Local'), scripts = version => join(local, 'Python', version, 'Scripts', 'pio.exe')
   const files = [scripts('pythoncore-3.13-64'), scripts('pythoncore-3.14-64')]
@@ -38,6 +48,17 @@ test('platformio runs pio in its root with the core directory unless the environ
   const owned = join('/', 'elsewhere')
   await platformio(f.ctx, ['--version'], host('linux', [pioOnPath], { PATH: bin, PLATFORMIO_CORE_DIR: owned }))
   assert.equal(f.calls[1].env.PLATFORMIO_CORE_DIR, process.env.PLATFORMIO_CORE_DIR)
+})
+
+test('platformio runs the pio of the configured or inherited core directory', async () => {
+  const f = await fixture({ version: 1, platformio: { root: 'firmware', coreDir: 'core-cache' } })
+  await f.file('firmware/platformio.ini')
+  const own = join(f.root, 'core-cache', 'penv', 'bin', 'pio')
+  await platformio(f.ctx, ['--version'], host('linux', [pioOnPath, own], { PATH: bin }))
+  assert.equal(f.calls[0].command, own)
+  const inherited = join('/', 'inherited-core'), inheritedPio = join(inherited, 'penv', 'bin', 'pio')
+  await platformio(f.ctx, ['--version'], host('linux', [pioOnPath, own, inheritedPio], { PATH: bin, PLATFORMIO_CORE_DIR: inherited }))
+  assert.equal(f.calls[1].command, inheritedPio, 'an inherited PLATFORMIO_CORE_DIR is the home in use')
 })
 
 test('a missing installation or missing arguments fail clearly, and a plan does not need PlatformIO', async () => {
