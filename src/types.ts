@@ -5,8 +5,34 @@ export type Flags = Record<string, string | boolean>
 export interface Invocation { command: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; input?: string; capture?: boolean; label?: string; timeout?: number; signal?: AbortSignal; prefix?: string; /** Start the program in the background and return once it launched; its output and exit status are not observed (used to open terminal windows). */ detached?: boolean; /** Defaults to [0]; only opt into a tool's documented nonzero success convention. */ successExitCodes?: readonly number[]; /** Defaults to true; explicit GUI launches can request a visible window. */ windowsHide?: boolean }
 export interface Result { stdout: string; stderr: string }
 export type Runner = (invocation: Invocation) => Promise<Result>
-export interface Images { source: string; background?: string; outputs?: { path: string; width: number; height?: number }[] }
-export interface NativeLocales { locales: Record<string, Record<string, string>>; defaultLocale: string; targets: { format: 'android' | 'apple'; directory: string; keys?: Record<string, string> }[] }
+export interface AssetCopy { source: string; path: string; normalize?: 'png' }
+export interface Images { source?: string; background?: string; outputs?: { path: string; width: number; height?: number }[]; copies?: AssetCopy[] }
+export interface NativeLocales { locales: Record<string, Record<string, string>>; defaultLocale: string; targets: NativeLocaleTarget[] }
+export type NativeLocaleTarget = { directory: string; keys?: Record<string, string> } & ({ format: 'android'; file?: 'strings.xml' } | { format: 'apple'; file?: 'Localizable.strings' | 'InfoPlist.strings' })
+/** One Xcode target whose localized resources `check-locales` verifies and `register-locales` maintains. */
+export interface LocaleRegistrationTarget {
+  /** Xcode target name, for example App or a widget extension. */
+  name: string
+  /** Directory with the `<locale>.lproj` folders, relative to the Capacitor root. Default `<project directory>/<name>`. */
+  directory?: string
+  /** Localized resources that belong to this target, for example InfoPlist.strings and Localizable.strings. */
+  files: string[]
+  /** Info.plist whose CFBundleLocalizations must list the locales: `true` for `<directory>/Info.plist`, a path, or `false`. Default true for the target named App. */
+  infoPlist?: boolean | string
+}
+/** Native declarations of the app's languages. Paths are relative to the Capacitor root and default to the standard Capacitor layout. */
+export interface LocaleRegistration {
+  /** Locale codes, as used for `<code>.lproj`. Default: the keys of `capacitor.locales.locales`. */
+  locales?: string[]
+  android?: { manifest?: string; localeConfig?: string; locales?: string[] }
+  ios?: { project?: string; locales?: string[]; targets: LocaleRegistrationTarget[] }
+}
+/** Explicit identities for `app-links generate|check`. Files go to `<directory>/.well-known`, relative to the config root. */
+export interface AppLinks {
+  directory: string
+  android?: { packageName: string; fingerprints: string[] }[]
+  apple?: { teamId: string; bundleId: string; paths: string[] }[]
+}
 export interface Config {
   version: 1;
   /** Environment used by cloudflare, hostinger, hosting, env and prisma commands when --env is omitted (single-environment projects). */
@@ -14,7 +40,7 @@ export interface Config {
   output?: { banners?: boolean };
   production?: { environments?: string[]; verify?: Command[] };
   vue?: { root?: string; typecheck?: 'build' | 'noEmit' | false; modes?: Record<string, string> };
-  capacitor?: Hooks & { root?: string; /** Config-root-relative version source. With --bump it must be the owning package.json. */ packageJson?: string; platforms?: ('android' | 'ios')[]; androidProject?: string; iosProject?: string; assets?: Images & { native?: boolean }; locales?: NativeLocales; live?: { host?: string; port?: number; https?: boolean; ca?: string; timeout?: number }; screenshots?: { output?: string; sizes?: { width: number; height: number }[] }; /** More Gradle modules (for example a Wear OS app) that share the package version. `project` is the module's build.gradle relative to the Capacitor root; `versionCodeOffset` is added to the native build number so each form factor gets its own version code. */ androidModules?: { project: string; versionCodeOffset?: number }[] };
+  capacitor?: Hooks & { root?: string; /** Config-root-relative version source. With --bump it must be the owning package.json. */ packageJson?: string; platforms?: ('android' | 'ios')[]; androidProject?: string; iosProject?: string; assets?: Images & { native?: boolean }; locales?: NativeLocales; localeRegistration?: LocaleRegistration; live?: { host?: string; port?: number; https?: boolean; ca?: string; timeout?: number }; screenshots?: { output?: string; sizes?: { width: number; height: number }[] }; /** More Gradle modules (for example a Wear OS app) that share the package version. `project` is the module's build.gradle relative to the Capacitor root; `versionCodeOffset` is added to the native build number so each form factor gets its own version code. */ androidModules?: { project: string; versionCodeOffset?: number }[] };
   /** Extra build settings (`NAME=value`) per platform and build kind. iOS: Xcode build settings for `release` and `testflight-only` builds. Android: Gradle project properties (`-PNAME=value`) for `debug` and `release` builds and for custom kinds selected with `android build --kind`. `all` applies to every build of the platform. Signing, version and build-configuration settings are rejected. */
   buildSettings?: { android?: Record<string, string[]>; ios?: Partial<Record<'all' | 'release' | 'testflight-only', string[]>> };
   android?: { root?: string; appId?: string; module?: string; apk?: string; aab?: string; mapping?: string; javaHome?: string; sdkRoot?: string };
@@ -25,6 +51,7 @@ export interface Config {
   cloudflare?: { credentialsFile?: string; targets: Record<string, CloudflareTarget> };
   hostinger?: { credentialsFile?: string; targets: Record<string, HostingerTarget> };
   browser?: { root?: string; directory: string; output: string; prepare?: Command[] };
+  appLinks?: AppLinks;
   dev?: { root?: string; processes: DevProcess[] };
   wait?: { targets: Record<string, WaitTarget> };
   env?: { directory?: string; module: string; environments?: string[]; autoCreate?: string[]; hints?: { template?: string; generate?: string } };
@@ -85,8 +112,8 @@ export interface MediaCaptureModule {
 }
 /** One long-running process started by `dev start`. `root` is relative to `dev.root`. */
 export interface DevProcess { name: string; command: Command; root?: string; environment?: Record<string, string>; /** Only started when named in `--with`. */ optional?: boolean }
-/** A TCP endpoint: explicit `host`/`port`, a `url`, or a URL read from `variable` (process environment, then `envFile`). */
-export interface WaitTarget { host?: string; port?: number; url?: string; variable?: string; envFile?: string; timeout?: number; hint?: string }
+/** HTTP takes a `url` or a URL read from `variable` (process environment, then `envFile`); TCP also accepts `host`/`port`. */
+export interface WaitTarget { host?: string; port?: number; url?: string; variable?: string; envFile?: string; timeout?: number; hint?: string; /** HTTP only; exact status, default 200. */ status?: number; /** HTTP only; exact response-header match, e.g. an expected release ID. */ marker?: { header: string; value: string } }
 /** Contract of the project module named by `env.module`. Project policy (defaults, rules, file formats) stays in that module. */
 export interface EnvModule {
   /** Default configuration for one environment. `null` marks a value a human must supply. */

@@ -5,6 +5,7 @@ import { parseSecretEnv } from './secret-env.js'
 import type { Context } from './context.js'
 import type { SecretsModule } from './types.js'
 import { credentials, payload, record, remoteJson, rows } from './remote.js'
+import { cloudflareRelease } from './cloudflare-releases.js'
 
 const api = 'https://api.cloudflare.com/client/v4'
 type Fetcher = typeof fetch
@@ -77,7 +78,7 @@ async function loadSecrets(ctx: Context, target: string, names: string[], file: 
 }
 
 export async function cloudflare(ctx: Context, action: string, fetcher: typeof fetch = fetch) {
-  ctx.requireEnvironment('Cloudflare commands', { implicit: true })
+  ctx.requireEnvironment('Cloudflare commands', { implicit: action !== 'promote' && action !== 'rollback' })
   const targets = ctx.section('cloudflare').targets
   requireValue(targets && typeof targets === 'object', 'Configure Cloudflare targets')
   const names = Object.keys(targets), name = ctx.string('target', names.length === 1 ? names[0]! : '')
@@ -86,6 +87,12 @@ export async function cloudflare(ctx: Context, action: string, fetcher: typeof f
   const target = { ...base, ...base.environments?.[ctx.environment] }
   const root = ctx.path(target.root ?? '.')
   requireValue(['worker', 'pages'].includes(target.kind), 'Cloudflare target kind must be worker or pages')
+  const wranglerEnv = target.wranglerEnv === false || (target.wranglerEnv === undefined && ctx.implicitEnvironment) ? undefined : target.wranglerEnv ?? ctx.environment
+  const branch = ctx.string('branch', target.branch ?? (ctx.environment === 'production' || ctx.implicitEnvironment ? 'main' : ctx.environment))
+  if (action === 'status' || action === 'd1-status' || action === 'promote' || action === 'rollback') {
+    await cloudflareRelease(ctx, action, target, root, wranglerEnv, branch, fetcher)
+    return
+  }
   if (action === 'setup-pages') {
     requireValue(target.kind === 'pages' && target.projectName && /^[a-z0-9][a-z0-9-]*$/u.test(target.projectName), 'Select a Pages target with a valid projectName')
     requireValue(ctx.dryRun || ctx.boolean('yes'), 'Pages resource creation requires --yes')
@@ -133,9 +140,9 @@ export async function cloudflare(ctx: Context, action: string, fetcher: typeof f
   await ctx.hooks(target.prepare, ctx.root)
   const secrets = !ctx.dryRun && ctx.config.cloudflare?.credentialsFile ? await credentials(ctx, ctx.config.cloudflare.credentialsFile) : {}
   const providerEnv = { ...(secrets.CLOUDFLARE_API_TOKEN ? { CLOUDFLARE_API_TOKEN: secrets.CLOUDFLARE_API_TOKEN } : {}), ...(target.accountId || secrets.CLOUDFLARE_ACCOUNT_ID ? { CLOUDFLARE_ACCOUNT_ID: target.accountId ?? secrets.CLOUDFLARE_ACCOUNT_ID } : {}) }
-  if (action === 'deploy-pages') await ctx.run('wrangler', ['pages', 'deploy', inside(root, target.directory!), '--project-name', target.projectName!, '--branch', ctx.string('branch', target.branch ?? (ctx.environment === 'production' || ctx.implicitEnvironment ? 'main' : ctx.environment)), ...(target.commitDirty ? ['--commit-dirty=true'] : [])], { cwd: root, env: providerEnv, label: 'Deploy Pages target' })
+  if (action === 'deploy-pages') await ctx.run('wrangler', ['pages', 'deploy', inside(root, target.directory!), '--project-name', target.projectName!, '--branch', branch, ...(target.commitDirty ? ['--commit-dirty=true'] : [])], { cwd: root, env: providerEnv, label: 'Deploy Pages target' })
   else {
-    const shared = ['--config', inside(root, target.config!), ...(target.wranglerEnv === false || (target.wranglerEnv === undefined && ctx.implicitEnvironment) ? [] : ['--env', target.wranglerEnv ?? ctx.environment])]
+    const shared = ['--config', inside(root, target.config!), ...(wranglerEnv ? ['--env', wranglerEnv] : [])]
     if (action === 'push-secrets') await ctx.run('wrangler', ['secret', 'bulk', ...shared], { cwd: root, env: providerEnv, input: JSON.stringify(secretValues ?? {}), label: 'Upload allowlisted Worker secrets' })
     else if (action === 'migrate-d1') await ctx.run('wrangler', ['d1', 'migrations', 'apply', target.d1Database!, '--remote', ...shared], { cwd: root, env: providerEnv, label: 'Apply remote D1 migrations' })
     else await ctx.run('wrangler', ['deploy', ...shared], { cwd: root, env: providerEnv, label: 'Deploy Worker target' })

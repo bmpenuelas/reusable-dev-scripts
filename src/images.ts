@@ -7,16 +7,46 @@ import type { Context } from './context.js'
 import type { Images, NativeLocales } from './types.js'
 
 export async function images(ctx: Context, root: string, config: Images) {
-  requireValue(typeof config.source === 'string', 'Configure an image source')
-  const source = await readFile(inside(root, config.source))
+  if (!config.outputs?.length) return
+  requireValue(config.source, 'Configure an image source for resized outputs')
+  const input = inside(root, config.source)
+  const source = ctx.dryRun ? undefined : await readFile(input)
   for (const output of config.outputs ?? []) {
     requireValue(Number.isInteger(output.width) && output.width > 0 && output.width <= 8192 && (!output.height || Number.isInteger(output.height) && output.height > 0 && output.height <= 8192), 'Invalid image output dimensions')
     const path = outputPath(root, output.path)
     requireValue(/\.(png|webp|jpe?g)$/iu.test(path), 'Image outputs must be PNG, JPEG or WebP; use electron.assets.ico/icns for desktop containers')
+    if (!source) continue
     const pipeline = sharp(source).resize(output.width, output.height ?? output.width, { fit: 'contain', background: config.background ?? '#00000000' })
     const bytes = /\.webp$/iu.test(path) ? await pipeline.webp().toBuffer() : /\.(jpe?g)$/iu.test(path) ? await pipeline.flatten({ background: config.background ?? '#ffffff' }).jpeg().toBuffer() : await pipeline.png().toBuffer()
     if (!ctx.dryRun) await writeChanged(path, bytes, ctx.boolean('check'))
   }
+}
+export function assetCopyPlan(root: string, config: Images, extraOutputs: (string | undefined)[] = []) {
+  const key = (path: string) => path.toLowerCase()
+  const entries = (config.copies ?? []).map(entry => {
+    const source = inside(root, entry.source), path = outputPath(root, entry.path)
+    requireValue(!entry.normalize || (entry.normalize === 'png' && /\.png$/iu.test(path)), 'PNG normalization needs a .png destination')
+    return { source, path, normalize: entry.normalize }
+  })
+  const claimed = new Set([...(config.outputs?.map(entry => entry.path) ?? []), ...extraOutputs.filter((path): path is string => !!path)].map(path => key(inside(root, path))))
+  if (config.source) claimed.add(key(inside(root, config.source)))
+  for (const entry of entries) {
+    requireValue(!claimed.has(key(entry.path)), 'Asset copy output collides with another output or the master image')
+    claimed.add(key(entry.path))
+  }
+  const destinations = new Set(entries.map(entry => key(entry.path)))
+  requireValue(entries.every(entry => !destinations.has(key(entry.source))), 'Asset copies cannot overwrite their own inputs or use another copy destination as input')
+  return entries
+}
+export async function assetCopies(ctx: Context, plan: ReturnType<typeof assetCopyPlan>) {
+  if (!plan.length) return
+  ctx.log(`${ctx.dryRun ? '[plan]' : '[rds]'} ${ctx.boolean('check') ? 'Check' : 'Write'} ${plan.length} explicit asset copies`)
+  if (ctx.dryRun) return
+  const files = await Promise.all(plan.map(async ({ source, path, normalize }) => {
+    const bytes = await readFile(source)
+    return { path, bytes: normalize ? await sharp(bytes).png({ compressionLevel: 9 }).toBuffer() : bytes }
+  }))
+  for (const { path, bytes } of files) await writeChanged(path, bytes, ctx.boolean('check'))
 }
 export function androidText(value: string): string { return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('\\', '\\\\').replaceAll("'", "\\'").replaceAll('"', '\\"').replaceAll('\n', '\\n').replace(/^([@?])/u, '\\$1') }
 const placeholders = (value: string) => [...value.matchAll(/%(?:\d+\$)?[sdif]|\{[\w.]+\}/gu)].map(x => x[0]).sort().join('|')
@@ -37,7 +67,11 @@ export function localeFiles(root: string, config: NativeLocales): Map<string, st
       })
       const androidLocale = locale.includes('-') ? `b+${locale.replaceAll('-', '+')}` : locale
       const directory = target.format === 'android' ? (locale === config.defaultLocale ? 'values' : `values-${androidLocale}`) : `${locale}.lproj`
-      const path = outputPath(root, join(target.directory, directory, target.format === 'android' ? 'strings.xml' : 'Localizable.strings'))
+      const names = target.format === 'android' ? ['strings.xml'] : ['Localizable.strings', 'InfoPlist.strings']
+      const file = target.file ?? names[0]!
+      requireValue(names.includes(file), `A ${target.format} locale target file must be ${names.join(' or ')}`)
+      const path = outputPath(root, join(target.directory, directory, file))
+      requireValue(!files.has(path), 'Native locale targets resolve to the same output file')
       files.set(path, target.format === 'android' ? `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${pairs.map(([key, value]) => `  <string name="${key}">${androidText(value)}</string>`).join('\n')}\n</resources>\n` : pairs.map(([key, value]) => `${JSON.stringify(key)} = ${JSON.stringify(value)};`).join('\n') + '\n')
     }
   }
@@ -51,11 +85,14 @@ export async function locales(ctx: Context) {
 }
 export async function capacitorAssets(ctx: Context) {
   const root = ctx.moduleRoot('capacitor'), config = ctx.section('capacitor').assets; requireValue(config, 'Configure capacitor.assets')
+  requireValue(config.native === false || config.source, 'Configure an image source for native assets')
+  const copies = assetCopyPlan(root, config, ['.rds/native-assets.json', '.rds/asset-input/icon.png'])
   await images(ctx, root, config)
   if (config.native !== false) {
     // Fingerprint only the native asset inputs; the platform generator remains the consumer's pinned tool.
     const stamp = outputPath(root, '.rds/native-assets.json')
-    const fingerprint = createHash('sha256').update(await readFile(inside(root, config.source))).update(JSON.stringify(config)).digest('hex') + '\n'
+    const source = ctx.dryRun ? undefined : await readFile(inside(root, config.source!))
+    const fingerprint = source ? createHash('sha256').update(source).update(JSON.stringify(config)).digest('hex') + '\n' : ''
     if (ctx.boolean('check')) {
       if (!ctx.dryRun) {
         const snapshot = JSON.parse(await readFile(stamp, 'utf8').catch(() => { throw new Error('Native assets have not been generated by rds') }))
@@ -64,12 +101,13 @@ export async function capacitorAssets(ctx: Context) {
       }
     }
     else {
-      const staging = outputPath(root, '.rds/asset-input'), source = await readFile(inside(root, config.source))
-      if (!ctx.dryRun) await writeChanged(outputPath(root, '.rds/asset-input/icon.png'), await sharp(source).png().toBuffer())
+      const staging = outputPath(root, '.rds/asset-input')
+      if (source) await writeChanged(outputPath(root, '.rds/asset-input/icon.png'), await sharp(source).png().toBuffer())
       const targets = ctx.flags.platform && ctx.flags.platform !== 'all' ? [ctx.string('platform')] : ctx.section('capacitor').platforms ?? ['android', 'ios']
       const args = ['generate', ...targets.map(target => `--${target}`), '--assetPath', staging]
       if (config.background) args.push('--iconBackgroundColor', config.background, '--splashBackgroundColor', config.background)
       await ctx.run('capacitor-assets', args, { cwd: root, label: 'Generate native icons and splash assets' })
+      await assetCopies(ctx, copies)
       if (!ctx.dryRun) {
         const outputs: Record<string, string> = {}
         const walk = async (directory: string) => {
@@ -89,6 +127,8 @@ export async function capacitorAssets(ctx: Context) {
         requireValue(Object.keys(outputs).length, 'Asset generator did not produce native outputs')
         await writeChanged(stamp, JSON.stringify({ input: fingerprint, outputs }, null, 2) + '\n')
       }
+      return
     }
   }
+  await assetCopies(ctx, copies)
 }

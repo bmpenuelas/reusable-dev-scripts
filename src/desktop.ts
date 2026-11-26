@@ -5,12 +5,14 @@ import { setTimeout as delay } from 'node:timers/promises'
 import sharp from 'sharp'
 import { inside, outputPath, requireValue, writeChanged } from './runtime.js'
 import { ownedDirectory } from './files.js'
-import { images } from './images.js'
+import { images, assetCopies, assetCopyPlan } from './images.js'
+import { checkSigningIdentity } from './signing.js'
 import type { Context } from './context.js'
 
 export async function electron(ctx: Context, action: string) {
   const config = ctx.section('electron'), root = ctx.moduleRoot('electron')
   if (action === 'assets') return electronAssets(ctx)
+  if (action === 'check-signing-identity') return checkSigningIdentity(ctx, root)
   if (action === 'dev') {
     requireValue(ctx.environment !== 'production', 'Desktop development cannot target production')
     const url = config.url ?? 'http://127.0.0.1:5173', parsed = new URL(url)
@@ -79,8 +81,14 @@ async function artifactPath(ctx: Context, root: string, value: string, option: s
 export async function electronAssets(ctx: Context) {
   const config = ctx.section('electron').assets, root = ctx.moduleRoot('electron')
   requireValue(config, 'Configure electron.assets')
+  // Validate every destination before the first write.
+  const copies = assetCopyPlan(root, config, [config.ico, config.icns])
   await images(ctx, root, config)
-  if (!config.ico && !config.icns) return
+  if (config.ico || config.icns) await desktopIcons(ctx, root, config)
+  await assetCopies(ctx, copies)
+}
+async function desktopIcons(ctx: Context, root: string, config: NonNullable<NonNullable<Context['config']['electron']>['assets']>) {
+  requireValue(config.source, 'Configure an image source for desktop icons')
   const source = await readFile(inside(root, config.source))
   const png = async (size: number, rounded = false) => {
     let image = sharp(source).resize(size, size, { fit: 'contain', background: config.background ?? '#00000000' })

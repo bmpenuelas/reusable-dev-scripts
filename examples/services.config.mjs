@@ -18,6 +18,8 @@ export default defineConfig({
   wait: {
     targets: {
       database: { variable: 'DATABASE_URL', envFile: 'backend/.env', timeout: 90, hint: 'Start it with the project database script.' },
+      // `rds wait http --target api` checks the application, not just the listening port.
+      api: { url: 'http://127.0.0.1:3000/health', status: 200, marker: { header: 'x-release', value: 'development' }, timeout: 30 },
     },
   },
   // `rds prisma migrate --env staging` applies migrations using backend/.env.staging.

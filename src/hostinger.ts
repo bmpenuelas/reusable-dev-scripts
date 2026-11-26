@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises'
-import { credentials, environmentFile, payload, record, remoteJson, rows } from './remote.js'
+import { credentials, environmentFile, isUuid, payload, record, remoteJson, rows } from './remote.js'
 import { requireValue } from './runtime.js'
 import type { Context } from './context.js'
 
@@ -13,6 +13,23 @@ export async function hostinger(ctx: Context, action: string, fetcher: typeof fe
   const target = { ...base, ...base.environments?.[ctx.environment] }
   requireValue(target.domain && /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9-]+$/u.test(target.domain), 'Configure a valid Hostinger target domain')
   requireValue(target.username && /^[a-zA-Z0-9_]+$/u.test(target.username), 'Configure the Hostinger account username')
+  const account = `https://developers.hostinger.com/api/hosting/v1/accounts/${encodeURIComponent(target.username)}`
+  const website = `${account}/websites/${encodeURIComponent(target.domain)}`
+  if (action === 'status') {
+    const requested = ctx.string('build-id')
+    requireValue(!requested || isUuid(requested), '--build-id must be a build UUID')
+    if (ctx.dryRun) { ctx.log(`[plan] Read ${requested ? `build ${requested}` : 'latest Node.js build'} for ${target.domain}; no provider requests`); return }
+    const token = (await credentials(ctx, config.credentialsFile)).HOSTINGER_API_TOKEN
+    requireValue(token, 'Set HOSTINGER_API_TOKEN in the shell or credentialsFile')
+    const builds = `${website}/nodejs/builds`
+    const response = await remoteJson(fetcher, requested ? `${builds}/${requested}` : `${builds}?page=1&per_page=1`, token)
+    const build = requested ? record(payload(response)) : rows(response)[0]
+    if (!build) { ctx.log(`[rds] No Node.js builds found for ${target.domain}`); return }
+    requireValue(isUuid(build.uuid) && (!requested || build.uuid.toLowerCase() === requested.toLowerCase()) &&
+      typeof build.state === 'string' && ['pending', 'running', 'completed', 'failed'].includes(build.state), 'Hostinger returned an unexpected build status')
+    ctx.log(`[rds] Hostinger ${target.domain}: build ${build.uuid} is ${build.state} (application health not checked)`)
+    return
+  }
   requireValue(ctx.dryRun || ctx.boolean('yes'), 'Hostinger operations require --yes (deployment replaces website contents)')
   requireValue(target.envFile, 'Configure the complete backend envFile')
   const envFile = target.envFile.replaceAll('{env}', ctx.environment)
@@ -31,8 +48,6 @@ export async function hostinger(ctx: Context, action: string, fetcher: typeof fe
   const token = secrets.HOSTINGER_API_TOKEN
   requireValue(token, 'Set HOSTINGER_API_TOKEN in the shell or credentialsFile')
   const values = await environmentFile(ctx, envFile, target.excludeEnv ?? [])
-  const account = `https://developers.hostinger.com/api/hosting/v1/accounts/${encodeURIComponent(target.username)}`
-  const website = `${account}/websites/${encodeURIComponent(target.domain)}`
   const api = (path: string, method = 'GET', body?: unknown) => remoteJson(fetcher, path, token, method, body)
   if (action === 'setup') {
     if (target.databaseVariable) {

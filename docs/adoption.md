@@ -111,6 +111,14 @@ Keep an acceptance record of commands and artifact checks, without credentials o
 | Start the services plus a phone live-reload session on demand | `dev.processes` with an `optional: true` entry and `rds dev tabs --with <name>` |
 | Give a Wear OS module its own version-code range | `capacitor.androidModules: [{ project, versionCodeOffset }]` |
 | Wait for a database before migrating | `rds wait tcp --target database` |
+| Wait for an API to answer with a given release | `rds wait http --target api` |
+| Check that Xcode and Android declare every language | `rds capacitor check-locales` |
+| Patch the Xcode project, plist and manifest after adding a language | `rds capacitor register-locales` |
+| Copy generated icons to web, watch or store folders | `capacitor.assets.copies` / `electron.assets.copies` |
+| Hand-write `assetlinks.json` and `apple-app-site-association` | `rds app-links generate` / `check` |
+| Call `aapt` to read an APK's permissions | `rds android inspect --artifact <apk> --format json`, with your own rules on the output |
+| Check a Developer ID certificate before a macOS build | `rds electron check-signing-identity` |
+| Fail CI when firmware no longer fits its OTA slot | `rds esp32 check-size --artifact <bin> --partitions <csv> --min-free-bytes <n>` |
 | Template, validate and generate environment files | `rds env template|validate|generate|check --env <name>` |
 | Migrate a staging or production database | `rds prisma migrate --env staging` |
 

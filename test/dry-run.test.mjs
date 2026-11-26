@@ -15,7 +15,8 @@ async function snapshot(root) {
 test('every public command can plan without writes, subprocesses or credential values', async () => {
   const config = {
     version: 1, vue: { typecheck: 'noEmit' },
-    capacitor: { platforms: ['android'], assets: { source: 'icon.png' }, locales: { defaultLocale: 'en', locales: { en: { title: 'Example' } }, targets: [{ format: 'android', directory: 'android/app/src/main/res' }] } },
+    capacitor: { platforms: ['android'], assets: { source: 'icon.png' }, locales: { defaultLocale: 'en', locales: { en: { title: 'Example' } }, targets: [{ format: 'android', directory: 'android/app/src/main/res' }] }, localeRegistration: { android: {}, ios: { targets: [{ name: 'App', files: ['InfoPlist.strings'] }] } } },
+    appLinks: { directory: 'web/public', apple: [{ teamId: 'ABCDE12345', bundleId: 'app.fixture', paths: ['/open/*'] }] },
     android: { appId: 'app.fixture' },
     store: { root: 'store', locales: ['en-US'], androidId: 'app.fixture', playKey: 'never-read-credentials.json' },
     vscode: {}, electron: { assets: { source: 'icon.png', outputs: [{ path: 'desktop/icon.png', width: 16 }] } }, swift: { executable: 'Example', plist: 'Info.plist', entitlements: 'app.entitlements', icon: 'icon.png' },
@@ -23,7 +24,7 @@ test('every public command can plan without writes, subprocesses or credential v
     hostinger: { targets: { api: { domain: 'api.example.com', username: 'account_example', directory: 'bundle', envFile: 'never-read.env', databaseVariable: 'DATABASE_URL' } } },
     browser: { directory: 'extension/dist', output: 'extension.zip' },
     dev: { processes: [{ name: 'one', command: ['node', '-e', 'NEVER_EXECUTE_OR_LOG_SECRET'] }, { name: 'two', command: ['node', '-e', ''] }] },
-    wait: { targets: { database: { host: '127.0.0.1', port: 9 } } },
+    wait: { targets: { database: { host: '127.0.0.1', port: 9 }, api: { variable: 'URL_NOT_SET', envFile: 'never-read.env', status: 204, marker: { header: 'x-release', value: 'NEVER_EXECUTE_OR_LOG_SECRET' } } } },
     env: { module: 'scripts/environments.mjs' },
     prisma: { envFile: '.env.{env}' },
     platformio: { root: '.' },
@@ -36,13 +37,18 @@ test('every public command can plan without writes, subprocesses or credential v
   for (const command of Object.keys(commands)) {
     const args = [...command.split(' '), '--cwd', f.root, '--dry-run']
     if (command.startsWith('cloudflare')) args.push('--env', 'staging', '--target', command.includes('pages') ? 'pages' : 'worker')
+    if (['cloudflare promote', 'cloudflare rollback'].includes(command)) args.push('--version-id', '00000000-0000-4000-8000-000000000001')
     if (command.startsWith('hosting ')) args.push('--env', 'staging', '--pages-target', 'pages')
     if (command.startsWith('hostinger')) args.push('--env', 'staging')
     if (command === 'electron notarize') args.push('--profile', 'fixture-profile', '--preflight')
     if (command.startsWith('env ') || command.startsWith('prisma ')) args.push('--env', 'staging')
     if (command === 'exec') args.push('--', 'node', '-e', 'NEVER_EXECUTE_OR_LOG_SECRET')
     if (command === 'store run') args.push('--', 'lanes')
+    if (command === 'android inspect') args.push('--artifact', 'never-built.apk')
+    if (command === 'electron check-signing-identity') args.push('--identity', 'Example Company (TEAMID1234)')
+    if (command === 'esp32 check-size') args.push('--artifact', 'never-built.bin', '--partitions', 'never-read.csv')
     if (command === 'platformio') args.push('--', 'run', '-e', 'NEVER_EXECUTE_OR_LOG_SECRET')
+    if (command.startsWith('wait ')) args.push('--target', command === 'wait http' ? 'api' : 'database')
     const logs = []
     await main(args, () => { throw new Error(`Unexpected process execution for ${command}`) }, line => logs.push(line))
     assert.ok(!logs.join('').includes('NEVER_EXECUTE_OR_LOG_SECRET'))

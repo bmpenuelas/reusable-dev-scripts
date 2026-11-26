@@ -66,6 +66,48 @@ Tests use synthetic directories, fake credentials, injected HTTP responses and s
 - [Hostinger CLI operations and API mapping](https://github.com/hostinger/api-cli)
 - [Hostinger Node.js cron](https://www.hostinger.com/support/how-to-run-cron-jobs-for-node-js-websites-at-hostinger/)
 
+## Release inspection and control
+
+Read provider state independently of application health. Run a named `rds wait http` check afterwards if you need to confirm what the application is serving.
+
+```sh
+rds cloudflare status --target worker --env staging
+rds cloudflare d1-status --target worker --env staging
+rds cloudflare status --target web --env production
+rds hostinger status --target api --env staging
+```
+
+For Workers and D1, RDS reads the effective file and environment with the consumer-local Wrangler's `unstable_readConfig` export. Generate the configured Wrangler file separately if needed. These commands require `CLOUDFLARE_API_TOKEN` and an explicit account ID: Wrangler `account_id` takes precedence for Workers and D1, then RDS target `accountId`, then `CLOUDFLARE_ACCOUNT_ID`. Use the narrow permissions for the selected operation: Workers Scripts Read/Write, Pages Read/Write, or D1 Read for the read-only migration queries. Status does not execute preparation or production hooks. A Pages production status uses Cloudflare's canonical deployment, not the latest build; preview lookup is bounded to ten pages of deployment history. Hostinger status uses the exact domain and username and only needs `HOSTINGER_API_TOKEN`, not the backend env file.
+
+Promotion and rollback require a selected environment (`--env` or `defaultEnvironment`), `--yes`, and an exact UUID. Protected environments also require `--allow-production` and run the project's `production.verify` before any provider request. These commands do not run deployment `prepare` hooks, build, upload, apply migrations, or change non-versioned settings. Worker rollback only accepts a version that served traffic in the recent deployments returned by Cloudflare. Pages rollback only accepts a successful production deployment of the exact project and configured branch; use `deploy-pages` to deploy a new artifact. RDS checks provider state after the write, never retries a write or rolls back automatically. If a write or its verification fails, check status before retrying. Worker rollback does not restore D1, KV, R2, Durable Object data or other backing resources.
+
+```sh
+rds cloudflare promote --target worker --env staging --version-id 00000000-0000-4000-8000-000000000001 --dry-run
+rds cloudflare rollback --target worker --env staging --version-id 00000000-0000-4000-8000-000000000002 --yes
+rds cloudflare rollback --target web --env production --deployment-id 00000000-0000-4000-8000-000000000003 --yes --allow-production
+```
+
+Dry-run describes the selected action without loading Wrangler, reading credentials, executing hooks, or contacting a provider. It cannot confirm that an ID exists or that a rollback is eligible. See [Worker deployment API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/deployments/methods/create/), [Pages rollback](https://developers.cloudflare.com/pages/configuration/rollbacks/) and [Hostinger Node.js build endpoints](https://github.com/hostinger/api-python-sdk/blob/main/docs/HostingNodeJSApi.md).
+
+## Verifying a published Bunny script
+
+Use a project script to verify the selected script's identity, encrypted secret names and published source. Supply the Bunny API key from the shell or CI secret store. The IDs, expected names and reviewed bundle in this example are placeholders supplied by the consuming project. This reads metadata and the published release; it does not publish or purge anything and is not an HTTP smoke test.
+
+```js
+import { readFile } from 'node:fs/promises'
+import { assertEdgeScript, bunnyClient, edgeScriptMatches, hasEdgeSecrets } from 'reusable-dev-scripts/bunny'
+
+const accessKey = process.env.BUNNY_API_KEY
+if (!accessKey) throw new Error('Set BUNNY_API_KEY')
+const script = bunnyClient(accessKey).script(12345)
+const expected = { name: 'example-edge', type: 2, zoneId: 67890, secretNames: ['ORIGIN_TOKEN'] }
+const source = await readFile(new URL('./reviewed-edge.js', import.meta.url), 'utf8')
+await assertEdgeScript(script, expected)
+if (!hasEdgeSecrets(await script.secrets(), expected.secretNames) || !edgeScriptMatches(await script.release(), source)) {
+  throw new Error('Published Bunny script does not match the reviewed release')
+}
+```
+
 ## Destructive hosted resource recreation
 
 `rds hosting reset --env staging --hostinger-target api --pages-target web --yes --confirm-host api-stage.example.com --confirm-project example-stage --output .rds/hosting-reset-staging.json` deletes the exact Hostinger website and its data, its configured database (including remote connections), cron commands under that site's directory, and the whole Pages project/deployment history, then recreates a website on the same discovered hosting order and a Direct Upload Pages project on main. It initializes a secret-free managed Node placeholder through the official CLI; no manual ZIP or site recreation is needed. The consuming project must rotate application secrets, regenerate URLs/configuration, create its DB/cron, deploy its application and verify it. No subscription purchase, account deletion, DNS-zone deletion, token revocation or OS reimage is performed.

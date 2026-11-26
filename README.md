@@ -159,19 +159,20 @@ Each command below starts with `rds`. Configure only the modules you use.
 | Runtime | `exec -- <command> [args]` |
 | Agent skill | `skill install` |
 | Vue/Vite | `vue build` |
-| Capacitor | `capacitor sync`, `copy`, `open`, `live`, `versions`, `prepare`, `assets`, `locales`, `screenshots` |
-| Android | `android build` (with `--kind <name>` for project-defined build settings), `install`, `start-adb` |
+| Capacitor | `capacitor sync`, `copy`, `open`, `live`, `versions`, `prepare`, `assets`, `locales`, `check-locales`, `register-locales`, `screenshots` |
+| Android | `android build` (with `--kind <name>` for project-defined build settings), `install`, `inspect`, `start-adb` |
 | Store media | `media list`, `scaffold`, `view`, `capture`, `render`, `check`, `sheet` |
 | Mobile stores | `store scaffold`, `check`, `changelog`, `export`, `upload-listing`, `upload-build`, `pull`, `doctor`, `verify`, `run` |
 | VS Code | `vscode package`, `publish` |
-| Electron | `electron dev`, `assets`, `clean`, `build`, `notarize` |
+| Electron | `electron dev`, `assets`, `clean`, `build`, `notarize`, `check-signing-identity` |
 | Native Swift | `swift icons`, `bundle` |
-| Cloudflare | `cloudflare setup-pages`, `deploy-worker`, `migrate-d1`, `deploy-pages`, `push-secrets` |
-| Hostinger | `hostinger setup`, `deploy` |
+| Cloudflare | `cloudflare setup-pages`, `deploy-worker`, `migrate-d1`, `d1-status`, `deploy-pages`, `push-secrets`, `status`, `promote`, `rollback` |
+| Hostinger | `hostinger setup`, `deploy`, `status` |
 | Hosting reset | `hosting reset`, `drop`, `recreate` (destructive, unprotected environments only) |
 | Browser extensions | `browser package` |
-| Local development | `dev start`, `dev tabs`, `wait tcp`, `env template`, `validate`, `generate`, `check`, `prisma migrate`, `status` |
-| Firmware tooling | `platformio -- <pio arguments>` |
+| Local development | `dev start`, `dev tabs`, `wait tcp`, `wait http`, `env template`, `validate`, `generate`, `check`, `prisma migrate`, `status` |
+| App links | `app-links generate`, `check` |
+| Firmware tooling | `platformio -- <pio arguments>`, `esp32 check-size` |
 
 Get exact supported flags without loading application configuration:
 
@@ -201,7 +202,10 @@ The application owns its tool versions. Install only what its selected module ne
 | Swift bundles/icons | macOS, Swift/Xcode command-line tools, explicit plist and entitlements |
 | Cloudflare | `wrangler`, existing deployment config, suitable account credentials |
 | Browser ZIP / image processing | Provided here; the app supplies built files/artwork |
-| Dev processes, TCP waits, environment files | Provided here; the app supplies commands, endpoints and an environment module |
+| Dev processes, TCP/HTTP waits, environment files | Provided here; the app supplies commands, endpoints and an environment module |
+| Locale registration, app-link files, ESP32 size check | Provided here; the app supplies native projects, identities or a built binary |
+| APK inspection | Android SDK `build-tools` (`aapt2`) |
+| macOS signing identity preflight | macOS and an installed Developer ID certificate |
 | Prisma migrations | `prisma` in the application, a generated environment file with the database URL |
 
 Fastlane lanes and a locked gem set ship with this package. Store commands use the consumer's `.rds/gems` cache—not global gem installations. Store metadata and credentials remain application-owned.

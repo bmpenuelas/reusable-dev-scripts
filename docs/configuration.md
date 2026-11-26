@@ -212,7 +212,31 @@ export default {
 }
 ```
 
-An MJS config can import a local catalogue adapter that returns this data shape. Keep resource membership, native declarations, and custom widget data in the application. Add separate targets to emit ordinary watch/widget string files.
+An MJS config can import a local catalogue adapter that returns this data shape. Keep custom widget data and store copy in the application. Add separate targets to emit ordinary watch/widget string files, and `file: 'InfoPlist.strings'` to translate Info.plist values.
+
+Two further pieces are optional. [Locale registration](commands.md#locale-registration) checks that Android and Xcode declare the languages, and `register-locales` maintains those declarations for the standard native layout. Asset `copies` place files that no generator places, and `capacitor assets --check` reports stale ones:
+
+```js
+export default {
+  version: 1,
+  capacitor: {
+    assets: {
+      source: 'assets/icon.png',
+      copies: [
+        { source: 'assets/favicon.svg', path: 'public/favicon.svg' },
+        { source: 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', path: 'ios/App/WatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png', normalize: 'png' },
+      ],
+    },
+    localeRegistration: {
+      locales: ['en', 'es'],
+      android: {},
+      ios: { targets: [{ name: 'App', files: ['InfoPlist.strings'] }] },
+    },
+  },
+}
+```
+
+Run `rds capacitor check-locales` and `rds capacitor assets --check` in CI. Keep artwork composition, watch layouts, pruning of unused generator output and target membership decisions in the project.
 
 ## Separate deployment mechanics from application policy
 

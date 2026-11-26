@@ -82,6 +82,8 @@ With `--bump`, the version source must be the owning `package.json`. RDS also up
 
 `capacitor.assets` accepts `source`, optional `background`, `native` (default true), and `outputs: [{ path, width, height? }]` for PNG/JPEG/WebP outputs. Source artwork composition remains local. rds stages a PNG logo for the consumer's `@capacitor/assets` CLI. `--platform` can restrict native generation. `--check` compares web outputs and checks the native input/output hash snapshot; generate once after adoption before using check mode. Changing or deleting a recorded native asset makes the check fail. No stale/unknown resource directories are automatically removed.
 
+`assets.copies: [{ source, path, normalize? }]` copies one file to one destination, both relative to the module root, for icons and artwork the generators do not place themselves (a web favicon, a watch icon, a store listing icon). Copies are byte for byte; `normalize: 'png'` instead re-encodes the input (any format Sharp reads) as a maximum-compression PNG, which needs a `.png` destination. They run after the resized outputs and the native generator, so a copy can reuse a generated file, and `--check` compares every destination without writing. Each destination must be unique, differ from the master image and the other outputs, and not be the input of another copy; there are no globs, directory copies or pruning. `source` is only needed for `outputs` and native generation, so `native: false` with only `copies` is valid. Normalized bytes come from the installed Sharp version: regenerate after upgrading it.
+
 ### Locales
 
 `capacitor.locales` is a normalized catalogue with `defaultLocale`, `locales: { en: { app_name: 'Example' }, ... }`, and output `targets`:
@@ -93,7 +95,31 @@ targets: [
 ]
 ```
 
-A target can map native keys to catalogue keys using `keys: { native_key: 'catalogue.key' }`. Additional targets can emit widget/watch/Wear resources. Generation checks translated placeholders, escapes XML/Apple strings, and emits BCP47 Android qualifiers. It does not patch Xcode membership, plist declarations, or app-specific translated data. Those transformations stay local. `--check` never writes and fails if a generated file differs.
+A target can map native keys to catalogue keys using `keys: { native_key: 'catalogue.key' }`. Additional targets can emit widget/watch/Wear resources. An Apple target writes `Localizable.strings` unless it sets `file: 'InfoPlist.strings'`, so a second target can translate `CFBundleDisplayName` and usage descriptions. Two targets that resolve to the same file are an error. Generation checks translated placeholders, escapes XML/Apple strings, and emits BCP47 Android qualifiers. `capacitor locales` only writes string files; declaring the languages to Android and Xcode is the separate, optional [locale registration](#locale-registration). App-specific translated data and store copy stay local. `--check` never writes and fails if a generated file differs.
+
+### Locale registration
+
+Translated files are not enough: Android's per-app language list, the Xcode project and `CFBundleLocalizations` must declare each language, and the stores read those declarations. Configure `capacitor.localeRegistration` to check them, and optionally to maintain them:
+
+```js
+localeRegistration: {
+  locales: ['en', 'es', 'pt-BR'],
+  android: {},
+  ios: {
+    targets: [
+      { name: 'App', files: ['InfoPlist.strings', 'Localizable.strings'] },
+      { name: 'WidgetExtension', files: ['Localizable.strings'] },
+    ],
+  },
+}
+```
+
+`locales` defaults to the keys of `capacitor.locales.locales`; `android.locales` and `ios.locales` override it when the platforms use different codes. Only the listed platforms are checked, and only the listed Xcode targets and files: target membership is your decision. Paths are relative to the Capacitor root and default to the standard layout: `android.manifest` is `android/app/src/main/AndroidManifest.xml`, `android.localeConfig` is `android/app/src/main/res/xml/locales_config.xml`, `ios.project` is `ios/App/App.xcodeproj`, a target's `directory` is `ios/App/<name>`, and `infoPlist` (`true`, a path or `false`) defaults to `<directory>/Info.plist` for the target named `App` and to `false` for the others.
+
+- `capacitor check-locales [--platform android|ios|all]`: read-only. Android needs the locale config listing exactly the configured languages and `<application android:localeConfig="@xml/...">`. Xcode needs each language in `knownRegions`, each configured file as a localized variant group in the target's Copy Bundle Resources (or inside a synchronized folder of that target without a membership exception), exactly the configured `<locale>.lproj` entries (`Base` is ignored), the files on disk, and a matching `CFBundleLocalizations`. Every difference is listed and the command exits non-zero, so it can run in CI or as a verification hook. Two things only report missing languages, never extra ones: `knownRegions`, which is shared by the whole project, and synchronized folders, where Xcode includes whatever is on disk.
+- `capacitor register-locales [--platform android|ios|all]`: writes those declarations. It creates or updates the locale config (keeping the root element's attributes), adds the manifest attribute, adds known regions, variant groups, file references and build files, removes variant group and locale config entries for languages you no longer list (`.lproj` files and `knownRegions` stay) and sets `CFBundleLocalizations`. The result is checked in memory first: if anything cannot be completed, nothing is written. It never creates string files (run `capacitor locales` or your own generator first), never creates Xcode targets, groups or build phases, and refuses a directly referenced strings file or a manifest that points `localeConfig` elsewhere. Running it again changes nothing, line endings are preserved, and `sync` never runs it for you.
+
+The edits assume Xcode's own text format for `project.pbxproj` and an XML `Info.plist`. Projects that generate the project file (XcodeGen, Tuist) should declare languages in that generator, and projects using Gradle's `generateLocaleConfig` should not also register an Android locale config. Review the diff and build once in Xcode after the first registration: a passing check is not a native build.
 
 ### Screenshots
 
@@ -106,6 +132,7 @@ A target can map native keys to catalogue keys using `keys: { native_key: 'catal
 - `build --configuration debug|release --format apk|aab [--kind <name>] [--clean] [--reveal]`: runs Gradle and verifies the expected artifact. Defaults to release AAB. The `buildSettings.android` lists for `all`, the configuration and the optional `--kind` are passed as `-PNAME=value` Gradle properties (see Build settings). `--reveal` is a best-effort file-manager action after verification. Windows Explorer launches visibly and its normal shell-handoff exit codes 0 and 1 are accepted without a warning; a genuine launch/other-exit failure logs a warning and leaves the successful build successful. Other tools still require exit code 0. Gradle failures and missing artifacts still fail the command. Custom Gradle tasks can follow `--`; artifact inference and reveal are skipped for them. After a verified release build, the R8 mapping (`android.mapping`, default `<module>/build/outputs/mapping/release/mapping.txt`) and native debug symbols (`<module>/build/outputs/native-debug-symbols/release/native-debug-symbols.zip`) are logged when they exist, ready for upload to the Play Console.
 - `install [--artifact <config-root-relative-apk>] [--device <serial>] [--physical] [--replace]`: installs an **already built** debug/custom APK and verifies it against `android.appId`. Device selection, existing-install lookup, explicit removal, APK installation and package verification have distinct step labels. No build, sync, uninstall, launch, or version bump is implicit. If installation reports success but final verification fails, compare the APK's actual application ID with `android.appId`; do not uninstall an unrelated release package to address a debug-ID mismatch.
 - `start-adb`: starts the ADB server using the configured SDK or consumer PATH and Android environment. No device, app ID or native project is required. It does not select/install/uninstall an app. Dry-run plans the operation; protected environments still require authorization.
+- `inspect --artifact <config-root-relative.apk> [--format text|json]`: read-only report of an existing APK from the Android SDK's `aapt2 dump badging`: package ID, version name and code, minimum and target SDK, whether it is debuggable, declared permissions and the permissions the platform implies. `aapt2` comes from the newest installed `build-tools` of `android.sdkRoot`, `ANDROID_SDK_ROOT` or `ANDROID_HOME`, else from PATH. With `--format json` stdout holds only the JSON object (`packageName`, `versionName`, `versionCode`, `minSdk`, `targetSdk`, `debuggable`, `permissions`, `impliedPermissions`; step lines and the banner go to stderr). It decides nothing: which permissions or versions are acceptable is a check in your project. App bundles are not supported, and it does not verify the signature.
 
 ## Stores
 
@@ -162,6 +189,9 @@ Microsoft Store screenshots must be screenshots of the app itself, so `windows.s
 - `clean`: cleans only `electron.output` (default `release/desktop`), then recreates its ownership marker. An existing unmarked directory is rejected, including in dry-run. Never mark or delete old output automatically to bypass this check; an operator must choose a fresh output or handle legacy files.
 - `build --platform mac|windows|linux --arch arm64|x64|all --format <format>` runs electron-builder with `--publish never`. `--unsigned` explicitly disables identity discovery. `--clean` only cleans a rds-owned output directory.
 - `notarize --artifact <file> [--staple <path>] [--profile <keychain-profile>] [--preflight]`: uses macOS notarytool, waits, then staples and validates. The profile comes from `--profile`, then `APPLE_NOTARY_PROFILE`, then `electron.notaryProfile`; Apple ID passwords are never accepted. A DMG or PKG is stapled itself. A ZIP cannot be stapled, so `--staple` names the contained `.app` (stapling a DMG or PKG other than the artifact also works). The staple target is resolved before submission, so a typo cannot waste a notarization. `--artifact` and `--staple` may use one `*` wildcard in the last path segment, which must match exactly one item (for example `release/desktop/*-mac-Intel.zip`). A full ZIP-then-DMG release is two invocations: the ZIP with `--staple` for the app, then the DMG.
+- `check-signing-identity [--identity <name>]`: optional macOS preflight before a signed build. Takes the certificate name from `--identity`, else `CSC_NAME`, without the `Developer ID Application:` prefix (for example `Example Company (TEAMID1234)`), and fails unless `security find-identity -v -p codesigning` lists exactly that valid identity. It signs nothing, does not print the keychain's identities, and is separate from `notarize --preflight`, which checks notarization credentials. It does not apply when the certificate is supplied to electron-builder as a file (`CSC_LINK`), and it covers Developer ID only, not Mac App Store certificates.
+
+`electron assets` also accepts `assets.copies` as described under [Assets](#assets); a copy may take a generated `ico` or `icns` as its input.
 
 ## Swift
 
@@ -179,6 +209,9 @@ Select `--target` when more than one exists. **An environment is required** (pas
 - `deploy-worker`: explicit Wrangler config + environment. The environment is passed to Wrangler as `--env`; set the target's `wranglerEnv` to another name, or to `false` when the Worker only has top-level configuration.
 - `deploy-pages`: built directory + project name + branch; branch is the target's `branch`, else `main` for production, else the environment name. `commitDirty: true` adds `--commit-dirty=true` so Wrangler deploys from a working tree with uncommitted changes without its warning; the default leaves Wrangler's behavior unchanged.
 - `migrate-d1`: `wrangler d1 migrations apply <d1Database> --remote` with the Worker target's explicit config and environment (`--env`, `wranglerEnv`), behind the same production guard and `prepare` hooks as `deploy-worker`. `d1Database` is the database name.
+- `d1-status`: lists migration files not recorded in the selected remote database. Uses the same target, Wrangler config and environment resolution as `migrate-d1`, but requires an explicit `database_id` on the matching binding. Reads only the schema and migration table; it does not initialize the table, apply SQL files, or run hooks. If the table is absent, every matching local file is pending.
+- `status [--branch <name>]`: shows the active Worker deployment and its version percentages, or the canonical production deployment / newest successful preview for the exact Pages branch. The optional branch override is only for Pages. Status makes no updates and does not run hooks.
+- `promote --version-id <uuid> --yes`: sends 100% of the selected Worker's traffic to an existing version without building or uploading it. `rollback --version-id <uuid> --yes` does the same for a version that served traffic in that Worker's recent deployment history. For Pages, use `rollback --deployment-id <uuid> --yes` on the configured production branch; preview deployments cannot be rolled back or promoted. See [release inspection and control](hosting.md#release-inspection-and-control) for guards and prerequisites.
 - `setup-pages`: creates the Direct Upload project and its custom domains (needs `--yes`). With `zoneId` it also keeps a proxied CNAME from each domain to `<projectName>.pages.dev`: a missing record is created, an unproxied one is made proxied, and a record that points anywhere else fails the command instead of being re-pointed. `wwwRedirect: true` (requires `zoneId` and exactly one domain, which must be the zone apex or the step is skipped) additionally keeps a proxied `www` CNAME to the apex and a Single Redirect rule identified by `redirectRef` (default `rds_www_redirect`): 301, path and query kept. Other redirect rules in the zone are never changed. A pre-existing `www` record that is not exactly that CNAME fails the command.
 - `push-secrets [--secrets-file <path>]`: reads the secrets file, optionally applies the project's own rules, checks an explicit name allowlist and sends JSON on stdin to `wrangler secret bulk`. Other variables cannot be uploaded. The order is: production guard, read and parse the file, `secretsModule`, then the `prepare` hooks, then the upload, so a rejected file causes no side effects. `--secrets-file` replaces `secretsFile` for one run and must stay inside the project.
 
@@ -186,6 +219,8 @@ Select `--target` when more than one exists. **An environment is required** (pas
 ` becomes a newline; an unquoted value ends at the first `#`, as in Node's own dotenv parser. `parseSecretEnv` is exported from the package and from `reusable-dev-scripts/secret-env` so project scripts read the same file the same way.
 
   `secretsModule` names a project module (config-root-relative) that holds the rules rds cannot know. It exports `secrets({ environment, target, file, root, values })`, where `values` is the parsed file (a frozen copy) and `file` its absolute path. It throws to stop the upload (the message must not contain a value) and returns the values to upload: the input plus anything the project derives or overrides, for example a credential read from another reviewed file. Only names in `secretNames` are sent; every one must be present and non-empty. Typical rules: the file must declare which environment it belongs to, a development file is refused, strength and uniqueness checks, cross-environment reuse, and validity checks such as a PEM parse. A dry-run reads no file and loads no module.
+
+Bunny.net has no command family: `reusable-dev-scripts/bunny` exports the mechanics (API client, edge script bundling, verified script deployment, DNS-only CNAME) for a project script that owns the zone, rule and check policy. See [verifying a published Bunny script](hosting.md#verifying-a-published-bunny-script).
 
 No infrastructure provisioning, database wiping, app configuration generation or account inference is performed. Preserve existing security/header/domain policy in the consuming project.
 
@@ -216,6 +251,10 @@ An entry with `optional: true` is skipped unless `--with name[,name]` names it; 
 `wait: { targets: { <name>: { host?, port?, url?, variable?, envFile?, timeout?, hint? } } }`. A target is a `host` and `port`, a `url`, or a `variable` holding a URL, read from the process environment first and then from `envFile` (dotenv, relative to the config root). The port falls back to the scheme default for HTTP, MySQL, PostgreSQL, Redis, MongoDB and AMQP. `--target` is optional when there is a single target. The default timeout is 90 seconds, retried every second.
 
 Only the host and port are printed, never the URL or its credentials. `hint` is appended to the failure message. Dry-run does not connect.
+
+`rds wait http [--target <name>] [--timeout <seconds>]`
+
+Uses a configured `url` or `variable` with optional `envFile` (same precedence as TCP), not a bare host and port. Sends GET, expects the exact `status` (default 200), and optionally checks an exact response-header value with `marker: { header: 'x-release', value: '2026-01' }`. Set the header in the application you want to check; the command does not interpret the body. It uses the first response without following redirects, always verifies HTTPS certificates, and rejects URL userinfo and fragments. URL contents, headers, response bodies and marker values are not printed. Each attempt is limited to five seconds within the overall timeout (default 90 seconds), with up to a second between attempts. Dry-run neither reads the URL variable/file nor makes a request.
 
 ### Environment files
 
@@ -259,10 +298,31 @@ export const outputs = (env, config) => [{ path: `.env.${env}`, content: `API_UR
 
 The tool's standard output is passed through unchanged so callers can parse it (for example JSON from `espefuse`); rds reports its own step line on standard error for this command, and result banners also go to standard error. The exit status is the tool's. The command has no environment, production guard or hooks: it is a launcher, and projects that flash or sign devices put their policy in the script that calls it. Dry-run plans without requiring PlatformIO to be installed.
 
+### ESP32 firmware size
+
+`rds esp32 check-size --artifact <firmware.bin> --partitions <partitions.csv> [--slot <name>] [--min-free-bytes <n>]`
+
+Read-only check of an already built binary against its partition table, for CI or before a release; it needs no configuration, PlatformIO installation or device. The budget is the smallest OTA app partition (`ota_0`…`ota_15`), or the app partition named by `--slot` for a layout without OTA. It fails when the binary leaves fewer than `--min-free-bytes` (default 0, plain bytes) in that budget. Both paths are relative to the config root (or the working directory without a config). Sizes may be decimal, hexadecimal or use `K`/`M`. It does not build, flash, sign or validate offsets, and does not know whether the table is the one the build used.
+
+## App links
+
+`rds app-links generate` writes, and `rds app-links check` compares, the two files Android App Links and Apple Universal Links fetch from a website:
+
+```js
+appLinks: {
+  directory: 'web/public',
+  android: [{ packageName: 'com.example.app', fingerprints: ['00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF'] }],
+  apple: [{ teamId: 'TEAMID1234', bundleId: 'com.example.app', paths: ['/open/*'] }],
+}
+```
+
+Files go to `<directory>/.well-known/assetlinks.json` and `apple-app-site-association`, relative to the config root. Every identity, SHA-256 certificate fingerprint and path pattern is explicit: nothing is read from signing keys or native projects. Configure only the platforms you publish. `check` compares what the files declare, so formatting, line endings, component comments and an empty legacy `apps` list do not matter; order does, because Apple uses the first matching component. `generate` leaves an equivalent file untouched and refuses, before writing anything, to overwrite a file that declares something it does not manage (`webcredentials`, `appclips`, exclusions or query components, other Android relations or targets) or is not valid JSON; keep maintaining such a file yourself. Neither command changes DNS, headers, entitlements, manifests or signing, deploys, or verifies the hosted URL. Serve both files over HTTPS without redirects, with a JSON content type.
+
 ## Hosting resources and API-token deployments
 
 Cloudflare Pages project creation and Hostinger Web/Cloud deployment mechanics are shared commands. See [the hosting guide](hosting.md) for typed targets, credentials, dry-run behavior, provider prerequisites, and safety boundaries. Application seeds, mock/demo policy, database migrations at build time, and content-retention decisions remain in the consuming project.
 
+`rds hostinger status [--target <name>] [--build-id <uuid>]` reads the latest Node.js build or the specified build for the configured site and account. It prints only the site, ID and provider state (pending, running, completed or failed), or reports no builds. A failed build is a reported state, not a failed status lookup. No `envFile`, deployment CLI, build logs, hooks or production-write approval are needed; a completed build is not an application health check.
 
 ## Destructive hosting reset
 

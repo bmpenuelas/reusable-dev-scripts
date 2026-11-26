@@ -18,6 +18,11 @@
 | Hostinger and Cloudflare Pages setup | `setup-pages`/`hostinger setup` create or change provider resources and need `--yes`; `deploy` uploads the built files |
 | `hosting reset`, `drop`, `recreate` | Permanently delete the configured website, database, cron jobs and (unless `--keep-pages`) the Pages project. Only unprotected environments and exact `--confirm-host`/`--confirm-project` values are accepted; `--dry-run` and `--check` change nothing |
 | `wait tcp` | Opens TCP connections to the configured endpoint; it changes nothing |
+| `wait http` | Sends GET requests to the configured URL without credentials or redirects; whatever that endpoint does on GET happens |
+| `capacitor check-locales`, `app-links check`, `esp32 check-size`, `android inspect` | Read local files and report; `inspect` runs the SDK's `aapt2` on the APK |
+| `capacitor register-locales` | Edits the Android manifest and locale config, the Xcode project file and Info.plist; it writes only when the complete result passes the check. Review the diff |
+| `app-links generate` | Writes the two local association files; refuses to overwrite declarations it does not manage. Publishing them is a separate step that changes which apps may open your links |
+| `electron check-signing-identity` | Lists the macOS keychain's code signing identities without printing them; signs nothing |
 | Swift bundle | Writes and signs an app bundle, ad-hoc unless an identity is configured |
 | `dev start` | Runs the configured processes until one exits; it cannot stop what a process spawns on its own |
 | `dev tabs` | Opens terminal windows that run the configured processes with your permissions; the processes outlive the command and are not stopped by it |

@@ -4,7 +4,10 @@ export default defineConfig({
   version: 1,
   cloudflare: {
     credentialsFile: '.secrets/deployment.env',
-    targets: { web: { kind: 'pages', directory: 'web/dist', projectName: 'example-app' } },
+    targets: {
+      web: { kind: 'pages', directory: 'web/dist', projectName: 'example-app' },
+      worker: { kind: 'worker', root: 'worker', config: 'wrangler.jsonc', d1Database: 'example-db' },
+    },
   },
   hostinger: {
     credentialsFile: '.secrets/deployment.env',

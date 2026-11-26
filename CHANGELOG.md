@@ -2,8 +2,19 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
-## Unreleased
+## 0.9.0
 
+- Added `capacitor check-locales` and `capacitor register-locales` with the `capacitor.localeRegistration` section: the check reads Android's locale config and manifest attribute, Xcode `knownRegions`, localized variant groups and target membership (or synchronized folders), the `.lproj` files and `CFBundleLocalizations` for explicitly listed targets and files, and reports missing and stale languages. `register-locales` is the separate, optional writer for the standard layout: it verifies the complete result before writing anything, preserves line endings, is idempotent and never deletes translation files or creates targets, groups or build phases. Neither runs during `sync`. Tested with synthetic projects; no Xcode or Gradle build was run on registered output.
+- Added `file: 'InfoPlist.strings'` to Apple targets of `capacitor.locales`. **Behavior change:** two locale targets that resolve to the same output file are now an error instead of the last one silently winning.
+- Added `assets.copies` (`capacitor` and `electron`): explicit source-to-destination copies, optionally `normalize: 'png'`, run after the generators and covered by `--check`. `assets.source` is now only required for resized outputs, desktop icons and native generation, and a `capacitor assets` dry-run no longer reads the source image.
+- Added `app-links generate` and `app-links check` with the `appLinks` section for `assetlinks.json` and `apple-app-site-association` from explicit identities, fingerprints and path patterns. `generate` refuses to overwrite declarations it does not manage. Nothing is inferred, signed, deployed or changed in DNS.
+- Added `android inspect --artifact <apk>` (package ID, version, SDK levels, debuggable flag and permissions from `aapt2`; `--format json` for project rules).
+- Added `electron check-signing-identity`: macOS check that the Developer ID Application identity named by `--identity` or `CSC_NAME` is installed. Signs nothing. Tested against recorded `security` output, not run on a real keychain.
+- Added `esp32 check-size`: a built binary against its OTA (or named) app partition and a minimum free-space budget.
+- Added `wait http` for bounded, named HTTP readiness checks with an exact response status and optional release header, without printing URLs or response contents.
+- Added `hostinger status` for a site's latest or named Node build and `cloudflare status` for Worker traffic or a Pages branch. `cloudflare d1-status` lists pending migrations without initializing a table or running migration SQL.
+- Added explicit Cloudflare Worker promotion and Worker/Pages rollback. Release changes require confirmation and keep production guards; read-back verifies provider state, not application health. No automatic rollback or backing-data restore.
+- Added the subpath export `reusable-dev-scripts/bunny` for project scripts that manage Bunny.net: a careful API client (reads are retried within bounds, writes never, redirects and response bodies are never followed or surfaced) for Pull Zones, edge rules, certificates, edge scripts and usage; `edgeScriptSource` (one self-contained edge script from ES modules, independent of line endings); `deployEdgeScript` (settings, encrypted secrets, draft and release, each read back, and refused for a script that is not the reviewed one, is linked elsewhere or holds a secret as a variable); and `cloudflareDnsOnlyCname` for one exact DNS-only record. There is no `rds bunny` command: what a zone, its rules and its checks should be is project policy. Tested against in-memory providers only.
 - `rds platformio` now runs the PlatformIO home's own `pio` first: when `PLATFORMIO_CORE_DIR` is set or `platformio.coreDir` is configured and that home has a `penv`, its `pio` comes before PATH (`PLATFORMIO_CMD` still wins). An older `pio` on PATH no longer drives a home whose platforms need a newer PlatformIO Core. **Behavior change** for projects with `coreDir` whose home has its own `penv`.
 
 ## 0.8.0

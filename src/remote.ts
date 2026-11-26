@@ -3,6 +3,10 @@ import { parseEnv } from 'node:util'
 import { requireValue } from './runtime.js'
 import type { Context } from './context.js'
 
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(value)
+}
+
 /** Local credentials never become command arguments, logs, or backend variables. */
 export async function credentials(ctx: Context, file?: string): Promise<NodeJS.ProcessEnv> {
   return { ...(file ? parseEnv(await readFile(ctx.path(file), 'utf8')) : {}), ...process.env }

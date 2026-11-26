@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url'
 import { requireValue } from './runtime.js'
 import { validateMedia } from './media-catalog.js'
 import { validateBuildSettings } from './build-settings.js'
+import { validateAppLinks } from './app-links.js'
+import { validateLocaleRegistration } from './locale-registration.js'
 import type { Config, Command } from './types.js'
 
 export function defineConfig(config: Config): Config { return validateConfig(config) }
@@ -12,7 +14,7 @@ export function validateConfig(value: unknown): Config {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'Configuration must be an object')
   const data = value as Record<string, unknown>
   requireValue(data.version === 1, 'Configuration version must be 1')
-  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'platformio', 'buildSettings', 'media', 'hostinger', 'defaultEnvironment']
+  const allowed = ['version', 'output', 'production', 'vue', 'capacitor', 'android', 'store', 'electron', 'swift', 'vscode', 'cloudflare', 'browser', 'dev', 'wait', 'env', 'prisma', 'platformio', 'buildSettings', 'media', 'hostinger', 'defaultEnvironment', 'appLinks']
   for (const [key, section] of Object.entries(data)) {
     requireValue(allowed.includes(key), `Unknown configuration section: ${key}`)
     if (key !== 'version' && key !== 'defaultEnvironment') requireValue(section && typeof section === 'object' && !Array.isArray(section), `Invalid ${key} configuration`)
@@ -20,7 +22,7 @@ export function validateConfig(value: unknown): Config {
   const fields: Record<string, string[]> = {
     output: ['banners'],
     production: ['environments', 'verify'], vue: ['root', 'typecheck', 'modes'],
-    capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterBuild', 'afterSync', 'verify', 'androidModules'],
+    capacitor: ['root', 'packageJson', 'platforms', 'androidProject', 'iosProject', 'assets', 'locales', 'live', 'screenshots', 'prepare', 'prepareByEnv', 'build', 'buildByPlatform', 'environment', 'environmentByPlatform', 'afterBuild', 'afterSync', 'verify', 'androidModules', 'localeRegistration'],
     android: ['root', 'appId', 'module', 'apk', 'aab', 'mapping', 'javaHome', 'sdkRoot'],
     store: ['root', 'locales', 'appLocales', 'defaultLocale', 'defaultLocales', 'iosDevices', 'androidId', 'iosId', 'appleKey', 'playKey', 'allowExternalCredentials', 'iosProject', 'iosScheme', 'hooks', 'versionPackage'],
     electron: ['root', 'url', 'start', 'assets', 'output', 'builderConfig', 'notaryProfile', 'prepare'],
@@ -58,6 +60,17 @@ export function validateConfig(value: unknown): Config {
     }
   }
   keys(config.store?.hooks, ['beforeUpload', 'afterBuildUpload'], 'store.hooks')
+  if (config.appLinks !== undefined) validateAppLinks(config.appLinks)
+  if (config.capacitor?.localeRegistration !== undefined) validateLocaleRegistration(config.capacitor.localeRegistration)
+  for (const assets of [config.capacitor?.assets, config.electron?.assets]) {
+    if (assets?.copies === undefined) continue
+    requireValue(Array.isArray(assets.copies), 'assets.copies must be an array')
+    for (const copy of assets.copies) {
+      keys(copy, ['source', 'path', 'normalize'], 'asset copy')
+      requireValue([copy?.source, copy?.path].every(value => typeof value === 'string' && value.length > 0 && !value.includes('\0')), 'Each asset copy needs a source and a destination path')
+      requireValue(copy.normalize === undefined || copy.normalize === 'png', 'Asset copy normalize must be png')
+    }
+  }
   validateBuildSettings(config.buildSettings)
   keys(config.store?.iosDevices, ['iphone', 'ipad', 'watch'], 'store.iosDevices')
   if (config.production?.environments) requireValue(Array.isArray(config.production.environments) && config.production.environments.length > 0 && config.production.environments.every(x => typeof x === 'string' && x.length), 'production.environments must be a non-empty string array')
@@ -112,10 +125,17 @@ export function validateConfig(value: unknown): Config {
   }
   if (config.wait) requireValue(config.wait.targets && typeof config.wait.targets === 'object' && !Array.isArray(config.wait.targets), 'wait.targets must be an object')
   for (const target of Object.values(config.wait?.targets ?? {})) {
-    keys(target, ['host', 'port', 'url', 'variable', 'envFile', 'timeout', 'hint'], 'wait target')
+    keys(target, ['host', 'port', 'url', 'variable', 'envFile', 'timeout', 'hint', 'status', 'marker'], 'wait target')
     requireValue(!!(target.url || target.variable || (target.host && target.port)), 'A wait target needs host and port, a url, or a variable')
     for (const field of ['port', 'timeout'] as const) if (target[field] !== undefined) requireValue(typeof target[field] === 'number' && target[field] > 0, `wait target ${field} must be a positive number`)
     for (const field of ['host', 'url', 'variable', 'envFile', 'hint'] as const) if (target[field] !== undefined) requireValue(typeof target[field] === 'string' && target[field].length > 0, `wait target ${field} must be a non-empty string`)
+    if (target.status !== undefined || target.marker !== undefined) requireValue(target.url || target.variable, 'An HTTP status or marker needs a URL or URL variable')
+    if (target.status !== undefined) requireValue(Number.isInteger(target.status) && target.status >= 200 && target.status <= 599, 'wait target status must be an integer from 200 to 599')
+    if (target.marker !== undefined) {
+      keys(target.marker, ['header', 'value'], 'wait target marker')
+      requireValue(typeof target.marker.header === 'string' && /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/u.test(target.marker.header), 'wait target marker needs a valid response header name')
+      requireValue(typeof target.marker.value === 'string' && /^[\x20-\x7e]+$/u.test(target.marker.value) && target.marker.value.trim() === target.marker.value, 'wait target marker needs a non-empty printable ASCII value without surrounding whitespace')
+    }
   }
   if (config.env) {
     requireValue(typeof config.env.module === 'string' && config.env.module.length > 0, 'env.module must be a non-empty string')

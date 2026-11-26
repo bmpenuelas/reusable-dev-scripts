@@ -22,7 +22,7 @@ Do not invent missing flags, turn plain strings into executable shell commands, 
 - Read applicable project instructions and root/workspace manifests.
 - Read the helper implementations being replaced, not just their names.
 - Identify build prerequisites, post-processing, version/lockfile ownership, native resource registration, authorization gates, and retry semantics.
-- Inventory every family, not only builds: dev-server launchers, readiness waits, environment-file generators, migrations, notarization, store listing checks and uploads, deployment scripts.
+- Inventory every family, not only builds: dev-server launchers, readiness waits, environment-file generators, migrations, notarization, store listing checks and uploads, deployment scripts, native-project patchers (language registration), icon copy steps, app-link association files, and checks on built APKs, signing identities or firmware sizes.
 - Identify credential sources by **variable/file names only**. Do not print, copy, commit, or request secret contents in a normal report.
 
 ### Propose the smallest change

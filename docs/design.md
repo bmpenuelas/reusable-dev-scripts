@@ -15,10 +15,14 @@ The CLI separates workflows by project kind. A change for a Swift bundle should 
 | [src/capacitor.ts](../src/capacitor.ts) / [src/android.ts](../src/android.ts) | Native workflow mechanics |
 | [src/versions.ts](../src/versions.ts) | Version preflight and monotonic native numbering |
 | [src/images.ts](../src/images.ts) / [src/screenshots.ts](../src/screenshots.ts) | Normalized assets, locale outputs, capture and resizing |
+| [src/locale-registration.ts](../src/locale-registration.ts) / [src/pbxproj.ts](../src/pbxproj.ts) | Read-only locale declaration checks, and verified, position-preserving Android/Xcode registration |
+| [src/app-links.ts](../src/app-links.ts) | Association files from explicit identities, with refusal to drop unmanaged declarations |
+| [src/apk.ts](../src/apk.ts) / [src/signing.ts](../src/signing.ts) / [src/firmware-size.ts](../src/firmware-size.ts) | Read-only artifact, keychain identity and firmware budget checks; policy stays with the consumer |
 | [src/store.ts](../src/store.ts) / [support/store](../support/store/) | Metadata checks, locked shared Fastlane lanes and Ruby invocation |
 | [src/desktop.ts](../src/desktop.ts) | Separate Electron and Swift operations |
 | [src/extensions.ts](../src/extensions.ts) / [src/cloudflare.ts](../src/cloudflare.ts) | Extension publication and explicit deployment targets |
-| [src/dev.ts](../src/dev.ts) / [src/wait.ts](../src/wait.ts) | Concurrent prefixed dev processes and TCP readiness waits |
+| [src/cloudflare-releases.ts](../src/cloudflare-releases.ts) | Scoped deployment reads and transitions, and SELECT-only D1 migration inspection |
+| [src/dev.ts](../src/dev.ts) / [src/wait.ts](../src/wait.ts) | Concurrent prefixed dev processes and TCP/HTTP readiness waits |
 | [src/env.ts](../src/env.ts) / [src/prisma.ts](../src/prisma.ts) | Per-environment file lifecycle around a project module, and Prisma migrations from a generated file |
 | `test/` (repository checkout) | Synthetic consumer fixtures and regression tests |
 | `scripts/smoke-package.mjs` (repository checkout) | Packed distribution/API/CLI consumer checks |

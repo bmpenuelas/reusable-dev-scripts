@@ -39,6 +39,8 @@ try {
   assert.ok(files.includes('dist/skill.js'), 'Missing skill installer')
   assert.ok(files.includes('dist/result.js'), 'Missing result banner runtime')
   assert.ok(files.includes('dist/npm-version.js'), 'Missing npm version bump runtime')
+  for (const name of ['locale-registration', 'pbxproj', 'app-links', 'apk', 'signing', 'firmware-size']) assert.ok(files.includes(`dist/${name}.js`), `Missing ${name} runtime`)
+  assert.ok(files.includes('dist/bunny.js') && files.includes('dist/bunny.d.ts'), 'Missing Bunny runtime or declarations')
   for (const expected of ['bin/rds.mjs', 'dist/cli.js', 'dist/index.js', 'dist/index.d.ts', 'src/types.ts', 'src/cli.ts', 'support/store/Fastfile', 'support/store/Gemfile.lock', 'support/store/metadata.mjs', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'LICENSE']) assert.ok(files.includes(expected), `Missing packed file: ${expected}`)
   assert.ok(!files.some(path => /^(test|node_modules|\.rds)\//u.test(path)), 'Packed private or generated development files')
   for (const name of files) if (/\.(?:md|mjs|js|json|ts)$/u.test(name)) assertPortableText(await readFile(join(source, name), 'utf8'), name)
@@ -73,6 +75,7 @@ try {
   const help = run(process.execPath, [entry, '--help'], temporary)
   assert.match(help, /^rds /)
   assert.match(help, /rds capacitor sync/)
+  for (const command of ['capacitor check-locales', 'capacitor register-locales', 'android inspect', 'electron check-signing-identity', 'esp32 check-size', 'app-links check']) assert.ok(help.includes(`rds ${command}`), `Missing packed command: ${command}`)
   const invalid = spawnSync(process.execPath, [entry, 'unknown'], { cwd: temporary, encoding: 'utf8', windowsHide: true })
   assert.equal(invalid.status, 1)
   assert.match(invalid.stderr, /^rds: Unknown command:/)
@@ -93,6 +96,13 @@ try {
   assert.match(stepOutput, /PACKED_STEPS_OK/)
   const consumer = join(temporary, 'consumer')
   await mkdir(join(consumer, 'node_modules/vite/bin'), { recursive: true })
+  // Import by public package specifier from outside the extracted package to exercise its real export map.
+  await cp(join(temporary, 'package'), join(consumer, 'node_modules/reusable-dev-scripts'), { recursive: true })
+  run(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import { bunnyClient, assertEdgeScript, deployEdgeScript, edgeScriptMatches, hasEdgeSecrets } from 'reusable-dev-scripts/bunny';
+    for (const fn of [bunnyClient, assertEdgeScript, deployEdgeScript, edgeScriptMatches, hasEdgeSecrets]) assert.equal(typeof fn, 'function');
+  `], consumer)
   await writeFile(join(consumer, 'reusable-dev-scripts.config.json'), JSON.stringify({ version: 1, vue: { typecheck: false } }))
   await writeFile(join(consumer, 'node_modules/vite/package.json'), JSON.stringify({ bin: { vite: 'bin/vite.mjs' } }))
   await writeFile(join(consumer, 'node_modules/vite/bin/vite.mjs'), "console.log('PACKED_CONSUMER_OK:' + process.argv.slice(2).join(','))")
