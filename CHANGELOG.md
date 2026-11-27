@@ -2,6 +2,11 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
+## 0.10.1
+
+- Fixed `capacitor locales --check` reporting generated string files as stale when only their line endings differ, as after a checkout with Git `core.autocrlf`. Any other difference still fails, and generating still writes LF.
+- Fixed the same false failure in `capacitor assets --check` for recorded native `.json` and `.xml` files and an SVG source rewritten with CRLF after generation. Binary files and `assets.copies` are still compared byte for byte. Existing hash snapshots stay valid.
+
 ## 0.10.0
 
 - Added `esp32 check-size --format text|json` (default `text`). With `json`, stdout holds only the measured sizes, also when the binary does not fit its budget (`fits: false`, non-zero exit).

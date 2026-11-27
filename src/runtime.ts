@@ -110,10 +110,14 @@ export const runProcess: Runner = async (invocation) => {
     })
   })
 }
-export async function writeChanged(path: string, content: string | Uint8Array, check = false): Promise<boolean> {
+/** The bytes with CRLF read as LF, to compare text that a Git checkout may have converted. */
+export const withLineFeeds = (bytes: Buffer): Buffer => Buffer.from(bytes.toString('latin1').replaceAll('\r\n', '\n'), 'latin1')
+/** `text` marks generated text: in check mode, differing only in CRLF/LF line endings is not stale. Writing is unaffected. */
+export async function writeChanged(path: string, content: string | Uint8Array, check = false, { text = false } = {}): Promise<boolean> {
   const before = await readFile(path).catch((e: NodeJS.ErrnoException) => { if (e.code !== 'ENOENT') throw e; return undefined })
   const bytes = Buffer.from(content)
   if (before?.equals(bytes)) return false
+  if (check && text && before && withLineFeeds(before).equals(withLineFeeds(bytes))) return false
   requireValue(!check, `Generated file is stale: ${path}`)
   await mkdir(dirname(path), { recursive: true })
   const temporary = `${path}.${process.pid}.tmp`

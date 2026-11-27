@@ -343,3 +343,47 @@ test('asset copies still cannot leave the config root, and sources stay in the m
   }
   await assert.rejects(readFile(join(outside, 'escape.png')), /ENOENT/u)
 })
+
+test('generated text that differs only in CRLF line endings is not stale, and any other difference still is', async () => {
+  const config = { version: 1, capacitor: { locales: { defaultLocale: 'en', locales: { en: { title: 'Example' } }, targets: [{ format: 'android', directory: 'res' }, { format: 'apple', directory: 'apple' }] } } }
+  const f = await project(config)
+  const outputs = ['res/values/strings.xml', 'apple/en.lproj/Localizable.strings']
+  await assert.rejects(f.run('capacitor', 'locales', '--check'), /stale/u)
+  await f.run('capacitor', 'locales')
+  const generated = await Promise.all(outputs.map(f.read))
+  for (const [index, path] of outputs.entries()) await f.file(path, generated[index].replaceAll('\n', '\r\n'))
+  await f.run('capacitor', 'locales', '--check')
+  assert.match(await f.read(outputs[0]), /\r\n/u)
+  await f.file(outputs[0], generated[0].replace('Example', 'Other').replaceAll('\n', '\r\n'))
+  await assert.rejects(f.run('capacitor', 'locales', '--check'), /stale/u)
+  await f.file(outputs[0], generated[0] + '\r\n')
+  await assert.rejects(f.run('capacitor', 'locales', '--check'), /stale/u)
+  await f.run('capacitor', 'locales')
+  assert.equal(await f.read(outputs[0]), generated[0])
+})
+
+test('native asset check accepts a CRLF checkout of text files but not changed text or binary files', async () => {
+  const f = await fixture({ version: 1, capacitor: { platforms: ['android', 'ios'], assets: { source: 'art/mark.svg' } } })
+  const mark = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8">\n<rect width="8" height="8"/>\n</svg>\n'
+  const xml = 'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml', contents = 'ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json', binary = 'android/app/src/main/res/mipmap-mdpi/ic_launcher.png'
+  await f.file('art/mark.svg', mark)
+  f.ctx.runner = async () => {
+    await f.file(xml, '<adaptive-icon>\n</adaptive-icon>\n')
+    await f.file(contents, '{\n  "images": []\n}\n')
+    await f.file(binary, Buffer.from('PNG\n\u0000'))
+    return { stdout: '', stderr: '' }
+  }
+  await capacitorAssets(f.ctx)
+  f.ctx.flags.check = true
+  const crlf = async path => f.file(path, (await readFile(join(f.root, path), 'utf8')).replaceAll('\n', '\r\n'))
+  for (const path of ['art/mark.svg', xml, contents]) await crlf(path)
+  await capacitorAssets(f.ctx)
+  await f.file(xml, '<adaptive-icon android:x="1">\r\n</adaptive-icon>\r\n')
+  await assert.rejects(capacitorAssets(f.ctx), /missing or modified/u)
+  await f.file(xml, '<adaptive-icon>\n</adaptive-icon>\n')
+  await crlf(binary)
+  await assert.rejects(capacitorAssets(f.ctx), /missing or modified/u)
+  await f.file(binary, Buffer.from('PNG\n\u0000'))
+  await f.file('art/mark.svg', mark.replace('<rect', '<circle'))
+  await assert.rejects(capacitorAssets(f.ctx), /Native assets are stale/u)
+})
