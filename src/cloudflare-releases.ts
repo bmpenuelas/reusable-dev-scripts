@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import { glob, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, relative } from 'node:path'
@@ -20,7 +21,8 @@ async function workerConfig(ctx: Context, root: string, path: string, env: strin
   const load = createRequire(join(root, 'package.json'))
   let read: ((args: { config: string; env?: string }, options: { hideWarnings: boolean }) => unknown) | undefined
   try {
-    const entry = inside(ctx.root, relative(ctx.root, load.resolve('wrangler')))
+    // Node resolves to the physical file, so compare it with the physical root: the project may be reached through a symlink.
+    const entry = inside(ctx.root, relative(realpathSync(ctx.root), load.resolve('wrangler')))
     read = load(entry).unstable_readConfig
   } catch { /* No global tool, no emitting module-load details. */ }
   requireValue(typeof read === 'function', 'Install a compatible consumer-local Wrangler with unstable_readConfig')

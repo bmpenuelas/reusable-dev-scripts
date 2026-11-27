@@ -47,7 +47,7 @@ The package smoke test explicitly disables inherited npm dry-run mode only for i
 
 Packing uses a complete buildable snapshot in the disposable smoke workspace, with the real package manifest and unchanged lifecycle definitions. Some npm 10 versions run `prepare` despite `--ignore-scripts`; any such compilation must remain inside that snapshot, never overwrite the live `dist` while parallel tests import it. The regression also checks live executable/module timestamps and sizes stay unchanged. Keep the ignore flag: isolation handles an older npm quirk, not permission to run arbitrary lifecycle hooks in the checkout.
 
-Update the command registry, types/runtime validation, documentation, examples, and relevant tests together. Example configs should be importable and generic. The [command reference](commands.md) describes behavior; do not rely on CLI names alone when changing sequencing or defaults.
+Update the command registry, types/runtime validation, documentation, examples, and relevant tests together; [AGENTS.md](../AGENTS.md#files-to-update-with-a-change) lists the files to check for a change and for a new version. Example configs should be importable and generic. The [command reference](commands.md) describes behavior; do not rely on CLI names alone when changing sequencing or defaults.
 
 ## Shared store support
 

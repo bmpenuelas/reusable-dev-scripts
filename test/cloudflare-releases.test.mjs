@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { rm, symlink } from 'node:fs/promises'
 import { cloudflare } from '../dist/cloudflare.js'
+import { Context } from '../dist/context.js'
 import { fixture } from './helpers.mjs'
 
 const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -28,7 +30,8 @@ async function workerFixture(flags = {}, binding = { binding: 'DB', database_nam
   await f.file('node_modules/wrangler/package.json', '{"name":"wrangler","main":"index.cjs"}')
   await f.file('node_modules/wrangler/index.cjs', `
     exports.unstable_readConfig = (args, options) => {
-      if (args.config !== ${JSON.stringify(path)} || args.env !== 'preview' || options.hideWarnings !== true) throw Error('wrong fixture config')
+      const real = require('node:fs').realpathSync
+      if (real(args.config) !== real(${JSON.stringify(path)}) || args.env !== 'preview' || options.hideWarnings !== true) throw Error('wrong fixture config')
       return { configPath: args.config, account_id: '${account}', name: 'fixture-preview', d1_databases: ${JSON.stringify([binding])} }
     }
   `)
@@ -45,6 +48,18 @@ test('Worker status resolves the effective config and prints only the active dep
   assert.equal(f.calls.length, 0)
   assert.match(f.messages.join('\n'), new RegExp(`${currentDeploy}: ${activeId} at 90%, ${oldId} at 10%`))
   assert.doesNotMatch(f.messages.join('\n'), /PRIVATE_|FIXTURE_TOKEN/)
+})
+
+test('Worker status finds the local Wrangler when the project is reached through a symlink', async t => {
+  const f = await workerFixture({ env: 'live' })
+  // A junction needs no extra rights on Windows; other platforms ignore the type.
+  const link = `${f.root}-link`
+  await symlink(f.root, link, 'junction')
+  t.after(() => rm(link, { force: true }))
+  const messages = []
+  const ctx = new Context(link, f.ctx.config, f.ctx.flags, async () => assert.fail('Unexpected command'), line => messages.push(line))
+  await cloudflare(ctx, 'status', async () => history(current))
+  assert.match(messages.join('\n'), new RegExp(currentDeploy))
 })
 
 test('Worker promotion guards before any requests, writes once without force, and checks exact read-back', async () => {

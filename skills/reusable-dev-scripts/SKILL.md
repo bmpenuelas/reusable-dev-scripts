@@ -53,6 +53,8 @@ When replacing a native localization script, adopt `check-locales` first and com
 
 Start with help, configuration validation and dry-run, then existing local checks. Keep old helpers until equivalent behavior is demonstrated. Do not turn a plan into a claim that a native artifact or remote workflow succeeded.
 
+Store keys need no config field when they already come from `SUPPLY_JSON_KEY`/`APP_STORE_CONNECT_API_KEY_PATH` or sit at `fastlane/play-service-account.json`/`fastlane/app-store-connect-api-key.json` under the store root; set `store.playKey`/`store.appleKey` only for another location, and check that key files are ignored by Git.
+
 For store commands a working key is not enough: the Play service account must be invited to the specific app, and the App Store Connect key needs the App Manager role. When `store doctor` reports `The caller does not have permission`, point the user to the [store account access](../../docs/configuration.md#store-account-access) checklist (Play Console app permissions *View app information*, *Manage store presence*, *Release apps to testing tracks*) rather than changing code or credentials.
 
 Do not run deployments, store uploads, signing, device replacement/data clearing, release promotion or rollback, or production actions just to verify a migration. Obtain the user's approval for those effects separately. `--allow-production` is acknowledgement, not a substitute for the application's authorization boundary.

@@ -17,6 +17,25 @@ export function storeCredentialPath(ctx: Context, filename: string): string {
   if (ctx.config.store?.allowExternalCredentials && isAbsolute(filename)) return resolve(filename)
   return ctx.path(filename)
 }
+// The variables and default files (under the store root) that support/store/Fastfile also reads.
+const storeKeys = {
+  android: { name: 'playKey', variable: 'SUPPLY_JSON_KEY', file: 'fastlane/play-service-account.json', label: 'Google Play service account key' },
+  ios: { name: 'appleKey', variable: 'APP_STORE_CONNECT_API_KEY_PATH', file: 'fastlane/app-store-connect-api-key.json', label: 'App Store Connect API key' },
+} as const
+type StorePlatform = keyof typeof storeKeys
+const defaultKeyFile = (ctx: Context, platform: StorePlatform) => relative(ctx.root, join(ctx.moduleRoot('store'), storeKeys[platform].file)).replaceAll('\\', '/')
+// store.<name>, else the environment variable, else the default file if it exists. All three obey the same containment rule.
+function storeKey(ctx: Context, platform: StorePlatform): string | undefined {
+  const { name, variable } = storeKeys[platform]
+  const filename = ctx.config.store?.[name] || process.env[variable]
+  if (filename) return storeCredentialPath(ctx, filename)
+  const fallback = defaultKeyFile(ctx, platform)
+  return existsSync(join(ctx.root, fallback)) ? storeCredentialPath(ctx, fallback) : undefined
+}
+const missingKey = (ctx: Context, platform: StorePlatform) => {
+  const { name, variable, label } = storeKeys[platform]
+  return `No ${label}: set store.${name} or ${variable}, or put the file at ${defaultKeyFile(ctx, platform)}`
+}
 export function storeSettings(ctx: Context) {
   const config = ctx.section('store'), root = ctx.moduleRoot('store')
   requireValue(config.locales?.length, 'Configure store.locales explicitly')
@@ -99,10 +118,10 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
   } else if (action === 'verify') {
     // Read-only comparison with the store drafts. The default (--platform all) covers every configured store.
     const only = ctx.choice('scope', ['text', 'media', 'all'], 'all')
-    const configured = { android: Boolean(config.androidId && config.playKey), ios: Boolean(config.iosId && config.appleKey) }
-    const platforms = platform === 'all' ? (['android', 'ios'] as const).filter(name => configured[name]) : [platform]
-    requireValue(platforms.length > 0, 'Configure store.androidId and store.playKey, or store.iosId and store.appleKey')
-    if (platform === 'all') for (const name of ['android', 'ios'] as const) if (!configured[name]) ctx.log(`[rds] Skipping ${name}: not configured`)
+    const configured = (name: StorePlatform) => Boolean((name === 'android' ? config.androidId : config.iosId) && storeKey(ctx, name))
+    const platforms = platform === 'all' ? (['android', 'ios'] as const).filter(configured) : [platform]
+    requireValue(platforms.length > 0, 'Configure store.androidId with a Google Play key, or store.iosId with an App Store Connect key (store.playKey / store.appleKey, their environment variables or default files)')
+    if (platform === 'all') for (const name of ['android', 'ios'] as const) if (!platforms.includes(name)) ctx.log(`[rds] Skipping ${name}: not configured`)
     // Android release notes are compared for one version code: --version-code, else the one derived from the package version.
     let versionCode = ctx.string('version-code')
     requireValue(!versionCode || /^[1-9]\d{0,9}$/u.test(versionCode), '--version-code must be a positive integer')
@@ -129,12 +148,17 @@ export async function store(ctx: Context, action: string, forwarded: string[]) {
     } else args = [platform, action]
   }
   const chosen = args[0] === 'lanes' ? platform : args[0]!
-  const playKey = config.playKey ? storeCredentialPath(ctx, config.playKey) : undefined
-  const appleKey = config.appleKey ? storeCredentialPath(ctx, config.appleKey) : undefined
+  // Only a platform this run works on looks beyond the config, so another store's variable cannot block it.
+  const active = lanes ? lanes.map(lane => lane[0]) : args[0] === 'lanes' ? [] : [chosen]
+  const keyFor = (name: StorePlatform) => {
+    const configured = config[storeKeys[name].name]
+    return active.includes(name) ? storeKey(ctx, name) : configured ? storeCredentialPath(ctx, configured) : undefined
+  }
+  const playKey = keyFor('android'), appleKey = keyFor('ios')
   if (args[1] === 'internal' && chosen === 'ios') requireValue(process.platform === 'darwin' || ctx.dryRun, 'Building a TestFlight IPA requires macOS/Xcode')
   if (uploading) { await ctx.guard(root); if (!ctx.dryRun && args[1] !== 'internal') await checkStore(ctx, chosen, scope, true); await ctx.hooks(config.hooks?.beforeUpload, ctx.root, chosen) }
-  if (chosen === 'ios' && args[0] !== 'lanes') requireValue(config.iosId && config.appleKey, 'Configure store.iosId and store.appleKey')
-  if (chosen === 'android' && args[0] !== 'lanes') requireValue(config.androidId && config.playKey, 'Configure store.androidId and store.playKey')
+  if (chosen === 'ios' && args[0] !== 'lanes') { requireValue(config.iosId, 'Configure store.iosId'); requireValue(appleKey, missingKey(ctx, 'ios')) }
+  if (chosen === 'android' && args[0] !== 'lanes') { requireValue(config.androidId, 'Configure store.androidId'); requireValue(playKey, missingKey(ctx, 'android')) }
   const cache = outputPath(ctx.root, '.rds/store'), wrapper = outputPath(ctx.root, '.rds/store/fastlane/Fastfile')
   if (!ctx.dryRun) { await mkdir(dirname(wrapper), { recursive: true }); await writeChanged(wrapper, `import ${JSON.stringify(join(support, 'Fastfile'))}\n`) }
   const ruby = rubyBinary(), selected = ruby === 'ruby' ? undefined : dirname(ruby)

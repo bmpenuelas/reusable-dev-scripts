@@ -11,6 +11,7 @@ export default defineConfig({
     iosDevices: { iphone: true, ipad: false, watch: false },
     androidId: 'com.example.app', iosId: 'com.example.app',
     // Existing, ignored files owned by the consuming app. Never commit their contents.
+    // Both fields are optional: SUPPLY_JSON_KEY / APP_STORE_CONNECT_API_KEY_PATH, then the default files under store/fastlane, are used without them.
     playKey: '.secrets/play-service-account.json',
     appleKey: '.secrets/app-store-connect.json',
     iosProject: 'ios/App/App.xcodeproj', iosScheme: 'App',

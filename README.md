@@ -208,7 +208,7 @@ The application owns its tool versions. Install only what its selected module ne
 | macOS signing identity preflight | macOS and an installed Developer ID certificate |
 | Prisma migrations | `prisma` in the application, a generated environment file with the database URL |
 
-Fastlane lanes and a locked gem set ship with this package. Store commands use the consumer's `.rds/gems` cache—not global gem installations. Store metadata and credentials remain application-owned.
+Fastlane lanes and a locked gem set ship with this package. Store commands use the consumer's `.rds/gems` cache—not global gem installations. Store metadata and credentials remain application-owned. A store key comes from `store.playKey`/`store.appleKey`, `SUPPLY_JSON_KEY`/`APP_STORE_CONNECT_API_KEY_PATH` or the default file under the store root ([details](docs/commands.md)).
 
 ## Integration principles
 

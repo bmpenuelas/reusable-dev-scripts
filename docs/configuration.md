@@ -65,7 +65,7 @@ export default {
 }
 ```
 
-Only `playKey`/`appleKey` accept this exception. Relative filenames still resolve inside the config root; `../` traversal is not enabled. Key contents are not loaded by config import or dry-run, copied into the project, or printed by rds. Fastlane reads them only during the requested real operation. Leave the opt-in off when project-contained keys are sufficient. Outputs and cleanup paths always remain contained. Set the relevant credential environment variables before an authenticated command; undefined fields are not credentials.
+Only `playKey`/`appleKey` accept this exception. Relative filenames still resolve inside the config root; `../` traversal is not enabled. Key contents are not loaded by config import or dry-run, copied into the project, or printed by rds. Fastlane reads them only during the requested real operation. Leave the opt-in off when project-contained keys are sufficient. Outputs and cleanup paths always remain contained. An undefined field falls back to `SUPPLY_JSON_KEY`/`APP_STORE_CONNECT_API_KEY_PATH` and then to the default key file, `fastlane/play-service-account.json` or `fastlane/app-store-connect-api-key.json` under the store root, so neither field is needed for those standard sources. Keep a key file in the checkout ignored by Git.
 
 ## Store account access
 

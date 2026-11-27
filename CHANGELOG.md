@@ -2,6 +2,12 @@
 
 Behavior that consumers can notice. Pin an exact version and read the relevant entry before upgrading.
 
+## 0.11.0
+
+- `store` commands now find a key without `store.playKey`/`store.appleKey`: `SUPPLY_JSON_KEY`/`APP_STORE_CONNECT_API_KEY_PATH`, then `fastlane/play-service-account.json`/`fastlane/app-store-connect-api-key.json` under the store root, which the shared Fastfile already read. A configured field still wins, and `allowExternalCredentials` is still required for a file outside the project. **Behavior change:** `store verify` now also covers a store whose key comes only from these fallbacks.
+- A missing store ID or key now names only what is missing, with the places a key can come from. Tested with synthetic projects in dry-run; no store was contacted.
+- Fixed `cloudflare status`, `d1-status`, `promote` and `rollback` reporting a missing consumer-local Wrangler when the project is reached through a symlink, such as a folder under the macOS temporary directory. A Wrangler outside the project is still refused.
+
 ## 0.10.1
 
 - Fixed `capacitor locales --check` reporting generated string files as stale when only their line endings differ, as after a checkout with Git `core.autocrlf`. Any other difference still fails, and generating still writes LF.
